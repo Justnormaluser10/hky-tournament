@@ -13,7 +13,7 @@ export interface AdminPayload {
 }
 
 export function signAdminToken(payload: AdminPayload): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: '12h' });
 }
 
 export function verifyAdminToken(token: string): AdminPayload | null {
@@ -37,7 +37,6 @@ export function setAdminCookie(token: string) {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
-    maxAge: 7 * 24 * 60 * 60, // 7 days
     path: '/',
   });
 }

@@ -196,13 +196,13 @@ export default async function HomePage() {
     <div className="space-y-8 sm:space-y-12 pb-16">
       {/* 1. HERO SECTION (MOBILE-FIRST SPORTS BROADCAST FEEL) */}
       <section className="relative pt-6 sm:pt-10 pb-8 sm:pb-12 px-4 sm:px-6 lg:px-8 overflow-hidden">
-        {/* Background Stadium Photo with Deep Dark Contrast Overlay */}
+        {/* Background Field Hockey Stadium Photo with Deep Dark Contrast Overlay */}
         <div
-          className="absolute inset-0 bg-cover bg-center pointer-events-none opacity-20"
-          style={{ backgroundImage: "url('/images/hockey-stadium.jpg')" }}
+          className="absolute inset-0 bg-cover bg-center pointer-events-none opacity-25 mix-blend-luminosity scale-105"
+          style={{ backgroundImage: "url('/images/hockey-stadium-blue.jpg')" }}
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#070b14]/90 via-[#070b14]/95 to-[#070b14] pointer-events-none" />
-        <div className="absolute -top-20 left-1/2 -translate-x-1/2 w-[500px] h-[250px] bg-emerald-500/20 blur-3xl pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#040814]/85 via-[#040814]/90 to-[#040814] pointer-events-none" />
+        <div className="absolute -top-20 left-1/2 -translate-x-1/2 w-[600px] h-[280px] bg-sky-500/15 blur-3xl pointer-events-none" />
 
         <div className="relative z-10 max-w-5xl mx-auto text-center space-y-4">
           {/* Live Stage Badge */}

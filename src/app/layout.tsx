@@ -2,9 +2,9 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'AMRELI 1st HOCKEY 7-SIDE TOURNAMENT | Official Platform',
+  title: 'LATE KISHAN BARAIYA(PAJI) HOCKEY CHAMPIONSHIP | Official Platform',
   description:
-    'Official tournament management platform for Amreli 1st Hockey 7-Side Tournament — Amreli, Gujarat, India. Live scores, fixtures, field hockey standings, top scorers, and knockout brackets.',
+    'Official tournament management platform for Late Kishan Baraiya(Paji) Hockey Championship — Amreli, Gujarat, India. Live scores, fixtures, field hockey standings, top scorers, and knockout brackets.',
   keywords: [
     'Amreli Hockey',
     '7-Side Hockey',
@@ -14,7 +14,7 @@ export const metadata: Metadata = {
     'Hockey Scores',
   ],
   openGraph: {
-    title: 'AMRELI 1st HOCKEY 7-SIDE TOURNAMENT',
+    title: 'LATE KISHAN BARAIYA(PAJI) HOCKEY CHAMPIONSHIP',
     description: 'Where Competition Meets Glory — Amreli, Gujarat, India.',
     type: 'website',
   },

@@ -69,11 +69,11 @@ export default function AdminLayout({
   const handleLogout = async () => {
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
-      router.push('/admin/login');
-      router.refresh();
     } catch (e) {
       console.error(e);
     }
+    router.push('/admin/login');
+    router.refresh();
   };
 
   const handleReturnToPublic = () => {
@@ -86,9 +86,20 @@ export default function AdminLayout({
   }
 
   return (
-    <div className="min-h-screen bg-[#070b14] text-slate-100 flex flex-col md:flex-row">
+    <div className="min-h-screen bg-[#040814] text-slate-100 flex flex-col md:flex-row relative selection:bg-cyan-500 selection:text-white">
+      {/* Field Hockey Blue Astro Turf Background Theme for Admin */}
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-fixed opacity-15 mix-blend-luminosity scale-105"
+          style={{ backgroundImage: "url('/images/blue-astro-turf.jpg')" }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#040814]/90 via-[#040814]/95 to-[#030712] pointer-events-none" />
+        <div className="absolute top-0 right-1/4 w-96 h-96 bg-cyan-600/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute inset-0 turf-grid opacity-20 pointer-events-none" />
+      </div>
+
       {/* Mobile Top bar */}
-      <div className="md:hidden flex items-center justify-between p-3.5 bg-slate-950 border-b border-white/10 sticky top-0 z-40">
+      <div className="md:hidden flex items-center justify-between p-3.5 bg-slate-950/95 border-b border-white/10 sticky top-0 z-40 backdrop-blur-md">
         <div className="flex items-center gap-2">
           <span className="text-xl">🏑</span>
           <span className="font-black text-xs sm:text-sm text-white uppercase tracking-wider">
@@ -189,7 +200,7 @@ export default function AdminLayout({
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-400" />
             <span className="text-xs font-bold uppercase text-slate-300 tracking-wider">
-              Amreli 1st Hockey 7-Side Tournament Director Dashboard
+              Late Kishan Baraiya(Paji) Hockey Championship Director Dashboard
             </span>
           </div>
 
@@ -202,7 +213,7 @@ export default function AdminLayout({
               <span>Public Website</span>
             </button>
             <span className="text-xs text-slate-400">
-              Logged in as: <strong className="text-emerald-400">{adminUser?.email || 'admin'}</strong>
+              Logged in as: <strong className="text-emerald-400">{adminUser?.name || adminUser?.email || 'Admin'}</strong>
             </span>
           </div>
         </header>

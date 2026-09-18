@@ -18,17 +18,29 @@ export async function POST(req: NextRequest) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    // Ensure uploads directory exists
-    const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
-    await mkdir(uploadsDir, { recursive: true });
+    let savedUrl = '';
+    try {
+      // Ensure uploads directory exists
+      const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
+      await mkdir(uploadsDir, { recursive: true });
 
-    const safeName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
-    const filePath = path.join(uploadsDir, safeName);
-    await writeFile(filePath, buffer);
+      const safeName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+      const filePath = path.join(uploadsDir, safeName);
+      await writeFile(filePath, buffer);
+      savedUrl = `/uploads/${safeName}`;
+    } catch (fsErr) {
+      console.warn('Filesystem write failed or read-only, using base64 fallback:', fsErr);
+    }
+
+    // Fallback if local filesystem write failed
+    if (!savedUrl) {
+      const mime = file.type || 'image/png';
+      savedUrl = `data:${mime};base64,${buffer.toString('base64')}`;
+    }
 
     return NextResponse.json({
       success: true,
-      url: `/uploads/${safeName}`,
+      url: savedUrl,
     });
   } catch (error: any) {
     console.error('Error uploading file:', error);

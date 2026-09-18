@@ -99,6 +99,7 @@ export default function AdminMatchesPage() {
   const [scoreA, setScoreA] = useState(0);
   const [scoreB, setScoreB] = useState(0);
   const [matchStatus, setMatchStatus] = useState<string>('UPCOMING');
+  const [matchDate, setMatchDate] = useState('');
   const [matchTime, setMatchTime] = useState('17:30');
   const [matchVenue, setMatchVenue] = useState('Pitch 1 - Main Turf');
   const [matchNotes, setMatchNotes] = useState('');
@@ -115,7 +116,7 @@ export default function AdminMatchesPage() {
   const [newTeamAId, setNewTeamAId] = useState('');
   const [newTeamBId, setNewTeamBId] = useState('');
   const [newRound, setNewRound] = useState('LEAGUE');
-  const [newDate, setNewDate] = useState('');
+  const [newDate, setNewDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [newTime, setNewTime] = useState('17:30');
   const [newVenue, setNewVenue] = useState('Pitch 1 - Main Turf');
 
@@ -147,6 +148,7 @@ export default function AdminMatchesPage() {
     setScoreA(m.teamAScore);
     setScoreB(m.teamBScore);
     setMatchStatus(m.status);
+    setMatchDate(m.date ? new Date(m.date).toISOString().split('T')[0] : '');
     setMatchTime(m.time);
     setMatchVenue(m.venue);
     setMatchNotes(m.notes || '');
@@ -191,6 +193,7 @@ export default function AdminMatchesPage() {
           teamAScore: Number(scoreA),
           teamBScore: Number(scoreB),
           status: matchStatus,
+          date: matchDate ? new Date(matchDate).toISOString() : undefined,
           time: matchTime,
           venue: matchVenue,
           notes: matchNotes,
@@ -596,8 +599,32 @@ export default function AdminMatchesPage() {
                 </div>
               </div>
 
-              {/* Status & Venue */}
-              <div className="grid grid-cols-2 gap-4">
+              {/* Match Date, Time & Status */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-bold uppercase text-slate-300 mb-1">
+                    Match Date
+                  </label>
+                  <input
+                    type="date"
+                    value={matchDate}
+                    onChange={(e) => setMatchDate(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/10 text-white text-xs focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase text-slate-300 mb-1">
+                    Kickoff Time
+                  </label>
+                  <input
+                    type="text"
+                    value={matchTime}
+                    onChange={(e) => setMatchTime(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/10 text-white text-xs focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+
                 <div>
                   <label className="block text-xs font-bold uppercase text-slate-300 mb-1">
                     Match Status
@@ -613,18 +640,6 @@ export default function AdminMatchesPage() {
                     <option value="POSTPONED">POSTPONED</option>
                     <option value="CANCELLED">CANCELLED</option>
                   </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold uppercase text-slate-300 mb-1">
-                    Kickoff Time
-                  </label>
-                  <input
-                    type="text"
-                    value={matchTime}
-                    onChange={(e) => setMatchTime(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/10 text-white text-xs focus:border-emerald-500 focus:outline-none"
-                  />
                 </div>
               </div>
 
@@ -827,6 +842,35 @@ export default function AdminMatchesPage() {
                 </div>
               </div>
 
+              {/* Match Date & Time */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold uppercase text-slate-300 mb-1">
+                    Match Date <span className="text-emerald-400">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={newDate}
+                    onChange={(e) => setNewDate(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/10 text-white text-xs focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase text-slate-300 mb-1">
+                    Kickoff Time
+                  </label>
+                  <input
+                    type="text"
+                    value={newTime}
+                    onChange={(e) => setNewTime(e.target.value)}
+                    placeholder="17:30"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/10 text-white text-xs focus:outline-none"
+                  />
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold uppercase text-slate-300 mb-1">
@@ -846,28 +890,15 @@ export default function AdminMatchesPage() {
 
                 <div>
                   <label className="block text-xs font-bold uppercase text-slate-300 mb-1">
-                    Time
+                    Venue
                   </label>
                   <input
                     type="text"
-                    value={newTime}
-                    onChange={(e) => setNewTime(e.target.value)}
-                    placeholder="17:30"
+                    value={newVenue}
+                    onChange={(e) => setNewVenue(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/10 text-white text-xs focus:outline-none"
                   />
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold uppercase text-slate-300 mb-1">
-                  Venue
-                </label>
-                <input
-                  type="text"
-                  value={newVenue}
-                  onChange={(e) => setNewVenue(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/10 text-white text-xs focus:outline-none"
-                />
               </div>
 
               <div className="pt-3 border-t border-white/10 flex justify-end gap-2">

@@ -213,7 +213,7 @@ export default function AdminSettingsPage() {
 
         <div className="p-4 rounded-xl bg-slate-950/70 border border-white/5 space-y-3">
           <p className="text-xs text-slate-300 leading-relaxed">
-            Running a database reset will clear existing records and re-populate the SQLite database with the official Amreli 1st Hockey 7-Side Tournament setup.
+            Running a database reset will clear existing records and re-populate the SQLite database with the official Late Kishan Baraiya(Paji) Hockey Championship setup.
           </p>
 
           <button

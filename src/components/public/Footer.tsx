@@ -12,7 +12,7 @@ export function Footer() {
             <div className="flex items-center gap-3">
               <span className="text-2xl">🏑</span>
               <span className="text-base sm:text-lg font-black tracking-tight text-white uppercase">
-                AMRELI 1st HOCKEY <span className="text-amber-400">7-SIDE</span> TOURNAMENT
+                LATE KISHAN BARAIYA(PAJI) <span className="text-amber-400">HOCKEY CHAMPIONSHIP</span>
               </span>
             </div>
             <p className="text-xs text-slate-400 max-w-md leading-relaxed">
@@ -82,7 +82,7 @@ export function Footer() {
         </div>
 
         <div className="pt-6 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
-          <p>© 2026 Amreli 1st Hockey 7-Side Tournament Committee. All Rights Reserved.</p>
+          <p>© 2026 Late Kishan Baraiya(Paji) Hockey Championship Committee. All Rights Reserved.</p>
           <p className="flex items-center gap-1">
             Dedicated to grassroots field hockey excellence in Saurashtra
           </p>

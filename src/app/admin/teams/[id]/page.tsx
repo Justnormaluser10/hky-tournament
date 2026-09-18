@@ -61,9 +61,13 @@ export default function AdminTeamSquadPage({
   const [position, setPosition] = useState('FORWARD');
   const [photo, setPhoto] = useState('');
   const [isCaptain, setIsCaptain] = useState(false);
-  const [status, setStatus] = useState('ACTIVE');
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
+
+  // Team Logo Edit State
+  const [isLogoOpen, setIsLogoOpen] = useState(false);
+  const [teamLogo, setTeamLogo] = useState('');
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   const fetchTeam = async () => {
     try {
@@ -91,6 +95,68 @@ export default function AdminTeamSquadPage({
     setIsCaptain(false);
     setStatus('ACTIVE');
     setIsAddOpen(true);
+  };
+
+  const openLogoModal = () => {
+    setTeamLogo(team?.logo || '');
+    setIsLogoOpen(true);
+  };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingLogo(true);
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+      if (data.url) {
+        setTeamLogo(data.url);
+      }
+    } catch (err) {
+      console.error('Failed to upload logo:', err);
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  const handleSaveTeamLogo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!team) return;
+    setSubmitting(true);
+    setActionError(null);
+
+    try {
+      const res = await fetch('/api/admin/teams', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: team.id,
+          name: team.name,
+          shortName: team.shortName,
+          logo: teamLogo.trim() || null,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setActionError(data.error || 'Failed to update team logo.');
+      } else {
+        setActionSuccess(`Logo for team "${team.name}" updated successfully.`);
+        setIsLogoOpen(false);
+        fetchTeam();
+      }
+    } catch {
+      setActionError('Failed to save team logo.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const openEditModal = (p: Player) => {
@@ -262,12 +328,21 @@ export default function AdminTeamSquadPage({
           </div>
         </div>
 
-        <button
-          onClick={openAddModal}
-          className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-emerald-900/30 flex items-center gap-2 transition shrink-0"
-        >
-          <Plus className="w-4 h-4" /> + Add Player to Squad
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={openLogoModal}
+            className="px-3.5 py-2.5 rounded-xl bg-slate-900 border border-white/10 hover:border-emerald-500/40 text-slate-300 hover:text-white font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 transition"
+          >
+            <UploadCloud className="w-4 h-4 text-emerald-400" />
+            <span>Change Logo</span>
+          </button>
+          <button
+            onClick={openAddModal}
+            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-emerald-900/30 flex items-center gap-2 transition shrink-0"
+          >
+            <Plus className="w-4 h-4" /> + Add Player to Squad
+          </button>
+        </div>
       </div>
 
       {actionSuccess && (
@@ -545,6 +620,90 @@ export default function AdminTeamSquadPage({
                 {submitting ? 'Deleting...' : 'Confirm Delete'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* CHANGE TEAM LOGO MODAL */}
+      {isLogoOpen && team && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="relative w-full max-w-md rounded-2xl bg-slate-900 border border-emerald-500/40 p-6 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <h3 className="text-base font-black uppercase text-white tracking-wider">
+                Change Team Logo: {team.name}
+              </h3>
+              <button
+                onClick={() => setIsLogoOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveTeamLogo} className="space-y-4">
+              <div className="flex flex-col items-center justify-center p-4 rounded-xl bg-slate-950/60 border border-white/5 space-y-3">
+                <TeamLogo
+                  logo={teamLogo || null}
+                  name={team.name}
+                  shortName={team.shortName}
+                  primaryColor={team.primaryColor}
+                  size="xl"
+                />
+                <span className="text-xs text-slate-400 font-medium">Logo Preview</span>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-300 mb-1">
+                  Logo URL or Upload Image
+                </label>
+                <input
+                  type="text"
+                  value={teamLogo}
+                  onChange={(e) => setTeamLogo(e.target.value)}
+                  placeholder="Paste URL or upload image below..."
+                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/10 text-white text-xs focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-between gap-2">
+                <label className="cursor-pointer px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-300 flex items-center gap-1.5 transition">
+                  <UploadCloud className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>{uploadingLogo ? 'Uploading...' : 'Upload Logo File'}</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLogoUpload}
+                    className="hidden"
+                  />
+                </label>
+
+                {teamLogo && (
+                  <button
+                    type="button"
+                    onClick={() => setTeamLogo('')}
+                    className="text-xs text-rose-400 hover:underline"
+                  >
+                    Remove Logo
+                  </button>
+                )}
+              </div>
+
+              <div className="pt-3 border-t border-white/10 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsLogoOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting || uploadingLogo}
+                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs uppercase tracking-wider disabled:opacity-50"
+                >
+                  {submitting ? 'Saving...' : 'Update Logo'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

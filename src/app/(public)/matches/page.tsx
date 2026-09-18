@@ -98,6 +98,61 @@ export default function MatchesPage() {
     { label: 'Final', value: 'FINAL' },
   ];
 
+  // Group scheduled matches chronologically by date
+  const groupedMatches = React.useMemo(() => {
+    const groups: { [dateKey: string]: { dateObj: Date; displayDate: string; matches: Match[] } } = {};
+
+    matches.forEach((match) => {
+      let dateKey = '9999-99-99';
+      let dateObj = new Date(8640000000000000);
+      let displayDate = 'To Be Announced';
+
+      if (match.date) {
+        const d = new Date(match.date);
+        if (!isNaN(d.getTime())) {
+          const year = d.getFullYear();
+          const month = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          dateKey = `${year}-${month}-${day}`;
+          dateObj = d;
+
+          const dayNum = d.getDate();
+          const monthName = d.toLocaleDateString('en-US', { month: 'long' });
+          displayDate = `${dayNum} ${monthName} ${year}`;
+        }
+      }
+
+      if (!groups[dateKey]) {
+        groups[dateKey] = {
+          dateObj,
+          displayDate,
+          matches: [],
+        };
+      }
+      groups[dateKey].matches.push(match);
+    });
+
+    // Sort chronologically from earliest to latest date
+    const sortedKeys = Object.keys(groups).sort();
+
+    return sortedKeys.map((key) => {
+      const group = groups[key];
+      // Preserve time and match number ordering within each date
+      group.matches.sort((a, b) => {
+        if (a.time && b.time && a.time !== b.time) {
+          return a.time.localeCompare(b.time);
+        }
+        return a.matchNumber - b.matchNumber;
+      });
+      return {
+        key,
+        displayDate: group.displayDate,
+        dateObj: group.dateObj,
+        matches: group.matches,
+      };
+    });
+  }, [matches]);
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
       {/* Header */}
@@ -155,7 +210,7 @@ export default function MatchesPage() {
         </div>
       </div>
 
-      {/* Matches Grid */}
+      {/* Matches Display Grouped By Date */}
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {[1, 2, 3, 4].map((i) => (
@@ -169,138 +224,171 @@ export default function MatchesPage() {
           <p className="text-xs text-slate-400 mt-1">Fixtures are being prepared or none match your filter.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {matches.map((match) => {
-            const isCompleted = match.status === 'COMPLETED';
-            const isLive = match.status === 'LIVE';
+        <div className="space-y-12">
+          {groupedMatches.map((group) => {
+            const dayOfWeek =
+              group.key !== '9999-99-99'
+                ? group.dateObj.toLocaleDateString('en-US', { weekday: 'long' })
+                : '';
 
             return (
-              <div
-                key={match.id}
-                onClick={() => setSelectedMatch(match)}
-                className="glass-card glass-card-hover rounded-2xl p-6 relative overflow-hidden cursor-pointer flex flex-col justify-between"
-              >
-                {/* Status & Round Header */}
-                <div className="flex items-center justify-between gap-2 mb-4 border-b border-white/5 pb-3">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs font-black text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20">
-                      M#{match.matchNumber}
+              <section key={group.key} className="space-y-4">
+                {/* Date Group Heading & Divider */}
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-sky-950/90 to-cyan-950/70 border border-sky-500/30 text-sky-200 shadow-md">
+                    <Calendar className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span className="text-sm sm:text-base font-black uppercase tracking-wide text-white">
+                      {group.displayDate}
                     </span>
-                    <span className="text-xs uppercase font-bold text-slate-400">
-                      {match.round.replace('_', ' ')}
-                    </span>
-                  </div>
-
-                  <div>
-                    {isCompleted ? (
-                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-black uppercase tracking-wider border border-emerald-500/30">
-                        Full Time
-                      </span>
-                    ) : isLive ? (
-                      <span className="px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-400 text-[10px] font-black uppercase tracking-wider border border-rose-500/30 animate-pulse">
-                        LIVE NOW
-                      </span>
-                    ) : (
-                      <span className="px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 text-[10px] font-bold uppercase tracking-wider border border-white/10">
-                        {match.time}
+                    {dayOfWeek && (
+                      <span className="text-xs font-bold text-sky-400/90 tracking-normal">
+                        ({dayOfWeek})
                       </span>
                     )}
                   </div>
-                </div>
-
-                {/* Scoreboard */}
-                <div className="space-y-4 my-2">
-                  {/* Team A */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3 min-w-0">
-                      {match.teamA ? (
-                        <TeamLogo
-                          name={match.teamA.name}
-                          shortName={match.teamA.shortName}
-                          logo={match.teamA.logo}
-                          primaryColor={match.teamA.primaryColor}
-                          size="md"
-                        />
-                      ) : (
-                        <div className="w-9 h-9 rounded-xl bg-slate-900 border border-dashed border-amber-500/40 flex items-center justify-center text-xs text-amber-400 font-mono shrink-0 shadow-inner">
-                          🏆
-                        </div>
-                      )}
-                      <div className="truncate">
-                        <span className="font-extrabold text-white text-base block truncate">
-                          {match.teamA?.name || match.knockout?.seedLabelA || 'TBD Qualifier'}
-                        </span>
-                        {!match.teamA && match.knockout?.seedLabelA && (
-                          <span className="text-[10px] text-slate-500 font-mono block truncate">
-                            {match.knockout.seedLabelA}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="text-right">
-                      {isCompleted || isLive ? (
-                        <span className="text-3xl font-black font-mono text-white">
-                          {match.teamAScore}
-                        </span>
-                      ) : (
-                        <span className="text-xs font-mono text-slate-500">—</span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Team B */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3 min-w-0">
-                      {match.teamB ? (
-                        <TeamLogo
-                          name={match.teamB.name}
-                          shortName={match.teamB.shortName}
-                          logo={match.teamB.logo}
-                          primaryColor={match.teamB.primaryColor}
-                          size="md"
-                        />
-                      ) : (
-                        <div className="w-9 h-9 rounded-xl bg-slate-900 border border-dashed border-amber-500/40 flex items-center justify-center text-xs text-amber-400 font-mono shrink-0 shadow-inner">
-                          🏆
-                        </div>
-                      )}
-                      <div className="truncate">
-                        <span className="font-extrabold text-white text-base block truncate">
-                          {match.teamB?.name || match.knockout?.seedLabelB || 'TBD Qualifier'}
-                        </span>
-                        {!match.teamB && match.knockout?.seedLabelB && (
-                          <span className="text-[10px] text-slate-500 font-mono block truncate">
-                            {match.knockout.seedLabelB}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="text-right">
-                      {isCompleted || isLive ? (
-                        <span className="text-3xl font-black font-mono text-white">
-                          {match.teamBScore}
-                        </span>
-                      ) : (
-                        <span className="text-xs font-mono text-slate-500">—</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Footer Info & Scorers teaser */}
-                <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-xs text-slate-400">
-                  <div className="flex items-center gap-1.5 truncate max-w-[70%]">
-                    <MapPin className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                    <span className="truncate">{match.venue}</span>
-                  </div>
-
-                  <span className="text-emerald-400 font-bold hover:underline shrink-0">
-                    {match.events.length > 0 ? `${match.events.length} Events` : 'Details'} →
+                  <div className="flex-1 h-px bg-gradient-to-r from-sky-500/30 via-white/10 to-transparent" />
+                  <span className="text-xs font-bold text-slate-400 bg-slate-900/80 px-2.5 py-1 rounded-lg border border-white/5 shrink-0">
+                    {group.matches.length} {group.matches.length === 1 ? 'Match' : 'Matches'}
                   </span>
                 </div>
-              </div>
+
+                {/* Matches Grid for this date */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {group.matches.map((match) => {
+                    const isCompleted = match.status === 'COMPLETED';
+                    const isLive = match.status === 'LIVE';
+
+                    return (
+                      <div
+                        key={match.id}
+                        onClick={() => setSelectedMatch(match)}
+                        className="glass-card glass-card-hover rounded-2xl p-6 relative overflow-hidden cursor-pointer flex flex-col justify-between"
+                      >
+                        {/* Status & Round Header */}
+                        <div className="flex items-center justify-between gap-2 mb-4 border-b border-white/5 pb-3">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs font-black text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20">
+                              M#{match.matchNumber}
+                            </span>
+                            <span className="text-xs uppercase font-bold text-slate-400">
+                              {match.round.replace('_', ' ')}
+                            </span>
+                          </div>
+
+                          <div>
+                            {isCompleted ? (
+                              <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-black uppercase tracking-wider border border-emerald-500/30">
+                                Full Time
+                              </span>
+                            ) : isLive ? (
+                              <span className="px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-400 text-[10px] font-black uppercase tracking-wider border border-rose-500/30 animate-pulse">
+                                LIVE NOW
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 text-[10px] font-bold uppercase tracking-wider border border-white/10">
+                                {match.time}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Scoreboard */}
+                        <div className="space-y-4 my-2">
+                          {/* Team A */}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3 min-w-0">
+                              {match.teamA ? (
+                                <TeamLogo
+                                  name={match.teamA.name}
+                                  shortName={match.teamA.shortName}
+                                  logo={match.teamA.logo}
+                                  primaryColor={match.teamA.primaryColor}
+                                  size="md"
+                                />
+                              ) : (
+                                <div className="w-9 h-9 rounded-xl bg-slate-900 border border-dashed border-amber-500/40 flex items-center justify-center text-xs text-amber-400 font-mono shrink-0 shadow-inner">
+                                  🏆
+                                </div>
+                              )}
+                              <div className="truncate">
+                                <span className="font-extrabold text-white text-base block truncate">
+                                  {match.teamA?.name || match.knockout?.seedLabelA || 'TBD Qualifier'}
+                                </span>
+                                {!match.teamA && match.knockout?.seedLabelA && (
+                                  <span className="text-[10px] text-slate-500 font-mono block truncate">
+                                    {match.knockout.seedLabelA}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="text-right">
+                              {isCompleted || isLive ? (
+                                <span className="text-3xl font-black font-mono text-white">
+                                  {match.teamAScore}
+                                </span>
+                              ) : (
+                                <span className="text-xs font-mono text-slate-500">—</span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Team B */}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3 min-w-0">
+                              {match.teamB ? (
+                                <TeamLogo
+                                  name={match.teamB.name}
+                                  shortName={match.teamB.shortName}
+                                  logo={match.teamB.logo}
+                                  primaryColor={match.teamB.primaryColor}
+                                  size="md"
+                                />
+                              ) : (
+                                <div className="w-9 h-9 rounded-xl bg-slate-900 border border-dashed border-amber-500/40 flex items-center justify-center text-xs text-amber-400 font-mono shrink-0 shadow-inner">
+                                  🏆
+                                </div>
+                              )}
+                              <div className="truncate">
+                                <span className="font-extrabold text-white text-base block truncate">
+                                  {match.teamB?.name || match.knockout?.seedLabelB || 'TBD Qualifier'}
+                                </span>
+                                {!match.teamB && match.knockout?.seedLabelB && (
+                                  <span className="text-[10px] text-slate-500 font-mono block truncate">
+                                    {match.knockout.seedLabelB}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="text-right">
+                              {isCompleted || isLive ? (
+                                <span className="text-3xl font-black font-mono text-white">
+                                  {match.teamBScore}
+                                </span>
+                              ) : (
+                                <span className="text-xs font-mono text-slate-500">—</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Footer Info & Scorers teaser */}
+                        <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-xs text-slate-400">
+                          <div className="flex items-center gap-1.5 truncate max-w-[70%]">
+                            <MapPin className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                            <span className="truncate">{match.venue}</span>
+                          </div>
+
+                          <span className="text-emerald-400 font-bold hover:underline shrink-0">
+                            {match.events.length > 0 ? `${match.events.length} Events` : 'Details'} →
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
             );
           })}
         </div>
