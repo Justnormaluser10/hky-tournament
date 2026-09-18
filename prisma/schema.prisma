@@ -1,0 +1,154 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Tournament {
+  id                 String         @id @default(cuid())
+  name               String         @default("AMRELI 1st HOCKEY 7-SIDE TOURNAMENT")
+  description        String?
+  logo               String?
+  banner             String?
+  location           String         @default("Amreli, Gujarat, India")
+  venue              String         @default("Amreli District Sports Complex Ground")
+  startDate          DateTime       @default(now())
+  endDate            DateTime       @default(now())
+  status             String         @default("LIVE") // UPCOMING, LIVE, COMPLETED
+  sport              String         @default("Field Hockey — 7-Side")
+  format             String         @default("LEAGUE_KNOCKOUT") // LEAGUE, KNOCKOUT, LEAGUE_KNOCKOUT
+  currentStage       String         @default("LEAGUE") // LEAGUE, QUARTER_FINALS, SEMI_FINALS, FINAL, CHAMPIONS
+  qualificationCount Int            @default(4) // e.g. 4 for Semi Finals or 8 for Quarter Finals
+  pointsForWin       Int            @default(3)
+  pointsForDraw      Int            @default(1)
+  pointsForLoss      Int            @default(0)
+  tieBreakerRules    String         @default("Points > Goal Difference > Goals For > Head-to-Head")
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  teams              Team[]
+  matches            Match[]
+  announcements      Announcement[]
+}
+
+model Team {
+  id            String       @id @default(cuid())
+  tournamentId  String
+  tournament    Tournament   @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  name          String
+  shortName     String
+  logo          String?
+  captainId     String?
+  coach         String?
+  description   String?
+  primaryColor  String       @default("#059669")
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  players       Player[]
+  homeMatches   Match[]      @relation("TeamA")
+  awayMatches   Match[]      @relation("TeamB")
+  matchEvents   MatchEvent[]
+}
+
+model Player {
+  id           String       @id @default(cuid())
+  teamId       String
+  team         Team         @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  name         String
+  jerseyNumber Int
+  position     String       // GOALKEEPER, DEFENDER, MIDFIELDER, FORWARD, UTILITY
+  photo        String?      // Optional: Professional sports avatar used if null
+  status       String       @default("ACTIVE") // ACTIVE, INJURED, SUSPENDED
+  isCaptain    Boolean      @default(false)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  matchEvents  MatchEvent[]
+}
+
+model Match {
+  id           String          @id @default(cuid())
+  tournamentId String
+  tournament   Tournament      @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  round        String          @default("LEAGUE") // LEAGUE, QUARTER_FINAL, SEMI_FINAL, FINAL
+  matchNumber  Int
+  teamAId      String?
+  teamA        Team?           @relation("TeamA", fields: [teamAId], references: [id], onDelete: Cascade)
+  teamBId      String?
+  teamB        Team?           @relation("TeamB", fields: [teamBId], references: [id], onDelete: Cascade)
+  teamAScore   Int             @default(0)
+  teamBScore   Int             @default(0)
+  date         DateTime        @default(now())
+  time         String          @default("17:30") // e.g. "17:30"
+  venue        String          @default("Pitch 1")
+  status       String          @default("UPCOMING") // UPCOMING, LIVE, COMPLETED, POSTPONED, CANCELLED
+  notes        String?
+  winnerId     String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  events       MatchEvent[]
+  knockout     KnockoutMatch?
+}
+
+model MatchEvent {
+  id        String   @id @default(cuid())
+  matchId   String
+  match     Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  teamId    String
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  playerId  String?
+  player    Player?  @relation(fields: [playerId], references: [id], onDelete: SetNull)
+  type      String   // GOAL, YELLOW_CARD, RED_CARD, GREEN_CARD
+  minute    Int
+  notes     String?
+  createdAt DateTime @default(now())
+}
+
+model KnockoutMatch {
+  id                  String   @id @default(cuid())
+  stage               String   // QUARTER_FINALS, SEMI_FINALS, FINAL
+  matchId             String   @unique
+  match               Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  bracketOrder        Int      // 1, 2, 3, 4
+  seedLabelA          String?  // e.g. "1st in League" or "Winner SF1"
+  seedLabelB          String?  // e.g. "4th in League" or "Winner SF2"
+  nextKnockoutMatchId String?
+  createdAt           DateTime @default(now())
+}
+
+model Announcement {
+  id           String     @id @default(cuid())
+  tournamentId String
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  title        String
+  message      String
+  type         String     @default("GENERAL") // RESULT, TABLE_UPDATE, QUALIFICATION, CHAMPION, GENERAL
+  priority     String     @default("NORMAL")  // NORMAL, URGENT
+  isPinned     Boolean    @default(false)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+
+model Admin {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         String   @default("SUPERADMIN") // SUPERADMIN, ADMIN
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model ActivityLog {
+  id          String   @id @default(cuid())
+  adminEmail  String
+  action      String
+  description String
+  createdAt   DateTime @default(now())
+}
