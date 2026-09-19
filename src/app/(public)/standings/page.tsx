@@ -132,11 +132,6 @@ export default async function StandingsPage() {
                                 {row.shortName}
                               </span>
                             </div>
-                            {isQualified && (
-                              <span className="hidden sm:inline-block px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[9px] font-black uppercase tracking-wider">
-                                QUALIFIED
-                              </span>
-                            )}
                           </Link>
                         </td>
 

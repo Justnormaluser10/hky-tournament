@@ -104,15 +104,15 @@ export function TournamentProgressionCard({
 
   return (
     <>
-      <div className="glass-card rounded-2xl p-5 sm:p-7 border-2 border-emerald-500/30 shadow-2xl space-y-6">
+      <div className="rounded-2xl p-5 sm:p-7 bg-slate-900/85 backdrop-blur-md border-2 border-emerald-400/50 shadow-2xl shadow-slate-950/60 space-y-6">
         {/* Header: Section 6 "TOURNAMENT PROGRESSION" */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/15 pb-4">
           <div>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-black uppercase tracking-wider mb-1">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/25 border border-emerald-400/50 text-emerald-200 text-xs font-black uppercase tracking-wider mb-1 shadow-sm">
               <Sparkles className="w-3.5 h-3.5 text-amber-400" />
               TOURNAMENT PROGRESSION
             </div>
-            <h2 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight">
+            <h2 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight drop-shadow-sm">
               {isLeagueStage
                 ? 'LEAGUE STAGE'
                 : isKnockoutActive
@@ -126,8 +126,8 @@ export function TournamentProgressionCard({
               <span
                 className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider flex items-center gap-1.5 ${
                   leagueStatus.isComplete
-                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                    : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                    ? 'bg-emerald-500/25 text-emerald-200 border border-emerald-400/50 shadow-sm'
+                    : 'bg-amber-500/25 text-amber-200 border border-amber-400/50 shadow-sm'
                 }`}
               >
                 <span

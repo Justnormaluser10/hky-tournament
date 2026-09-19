@@ -51,38 +51,38 @@ export default async function AdminDashboardPage() {
   return (
     <div className="space-y-6 sm:space-y-8 max-w-7xl mx-auto pb-12">
       {/* Top Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/15 pb-6">
         <div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-bold uppercase tracking-wider mb-2">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/25 border border-emerald-400/50 text-emerald-200 text-xs font-black uppercase tracking-wider mb-2 shadow-sm shadow-emerald-950/40">
             <Sparkles className="w-3.5 h-3.5 text-amber-400" />
             Tournament Director Control Center
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-white uppercase tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-black text-white uppercase tracking-tight drop-shadow-sm">
             Tournament Overview
           </h1>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs sm:text-sm text-slate-200 font-medium mt-1">
             Real-time status of {tournament?.name} • Stage:{' '}
-            <strong className="text-emerald-400 uppercase">{tournament?.currentStage}</strong>
+            <strong className="text-emerald-300 font-black uppercase">{tournament?.currentStage}</strong>
           </p>
         </div>
 
         {/* Quick actions */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2.5">
           <Link
             href="/admin/matches"
-            className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs uppercase tracking-wider transition shadow-md flex items-center gap-1.5"
+            className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-black text-xs uppercase tracking-wider transition shadow-lg shadow-emerald-500/30 border border-emerald-300/50 flex items-center gap-1.5"
           >
             <Calendar className="w-3.5 h-3.5" /> Enter Scores
           </Link>
           <Link
             href="/admin/teams"
-            className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white border border-white/10 font-bold text-xs uppercase tracking-wider transition flex items-center gap-1.5"
+            className="px-3.5 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-white border-2 border-emerald-400/60 hover:border-emerald-300 font-black text-xs uppercase tracking-wider transition flex items-center gap-1.5 shadow-md shadow-slate-950/50"
           >
             <Users className="w-3.5 h-3.5" /> Manage Teams
           </Link>
           <Link
             href="/admin/knockout"
-            className="px-3.5 py-2 rounded-xl bg-purple-900/60 hover:bg-purple-800/60 text-purple-200 border border-purple-500/30 font-bold text-xs uppercase tracking-wider transition flex items-center gap-1.5"
+            className="px-3.5 py-2 rounded-xl bg-purple-900/80 hover:bg-purple-800 text-purple-100 border-2 border-purple-400/60 hover:border-purple-300 font-black text-xs uppercase tracking-wider transition flex items-center gap-1.5 shadow-md shadow-purple-950/50"
           >
             <GitFork className="w-3.5 h-3.5" /> Knockouts
           </Link>
@@ -106,53 +106,53 @@ export default async function AdminDashboardPage() {
 
       {/* 2. METRICS ROW */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
-        <div className="glass-card rounded-2xl p-4 sm:p-5 border-emerald-500/20">
-          <span className="text-[11px] font-bold uppercase text-slate-400 tracking-wider block">
+        <div className="rounded-2xl p-4 sm:p-5 bg-slate-900/85 backdrop-blur-md border border-white/20 shadow-xl shadow-slate-950/50">
+          <span className="text-xs font-black uppercase text-slate-200 tracking-wider block">
             Total Teams
           </span>
           <div className="flex items-baseline justify-between mt-2">
             <span className="text-2xl sm:text-4xl font-black font-mono text-white">
               {totalTeams}
             </span>
-            <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">
+            <span className="text-[10px] font-black text-emerald-300 bg-emerald-500/20 px-2 py-0.5 rounded border border-emerald-400/30">
               Active
             </span>
           </div>
         </div>
 
-        <div className="glass-card rounded-2xl p-4 sm:p-5 border-emerald-500/20">
-          <span className="text-[11px] font-bold uppercase text-slate-400 tracking-wider block">
+        <div className="rounded-2xl p-4 sm:p-5 bg-slate-900/85 backdrop-blur-md border border-white/20 shadow-xl shadow-slate-950/50">
+          <span className="text-xs font-black uppercase text-slate-200 tracking-wider block">
             Rostered Players
           </span>
           <div className="flex items-baseline justify-between mt-2">
             <span className="text-2xl sm:text-4xl font-black font-mono text-emerald-400">
               {totalPlayers}
             </span>
-            <span className="text-[10px] font-mono text-slate-500">Registered</span>
+            <span className="text-[10px] font-mono text-slate-300 font-bold">Registered</span>
           </div>
         </div>
 
-        <div className="glass-card rounded-2xl p-4 sm:p-5 border-amber-500/20">
-          <span className="text-[11px] font-bold uppercase text-slate-400 tracking-wider block">
+        <div className="rounded-2xl p-4 sm:p-5 bg-slate-900/85 backdrop-blur-md border border-white/20 shadow-xl shadow-slate-950/50">
+          <span className="text-xs font-black uppercase text-slate-200 tracking-wider block">
             Matches Completed
           </span>
           <div className="flex items-baseline justify-between mt-2">
             <span className="text-2xl sm:text-4xl font-black font-mono text-amber-400">
               {completedMatches}
             </span>
-            <span className="text-[10px] font-mono text-slate-400">of {totalMatches}</span>
+            <span className="text-[10px] font-mono text-slate-300 font-bold">of {totalMatches}</span>
           </div>
         </div>
 
-        <div className="glass-card rounded-2xl p-4 sm:p-5 border-teal-500/20">
-          <span className="text-[11px] font-bold uppercase text-slate-400 tracking-wider block">
+        <div className="rounded-2xl p-4 sm:p-5 bg-slate-900/85 backdrop-blur-md border border-white/20 shadow-xl shadow-slate-950/50">
+          <span className="text-xs font-black uppercase text-slate-200 tracking-wider block">
             Upcoming Fixtures
           </span>
           <div className="flex items-baseline justify-between mt-2">
             <span className="text-2xl sm:text-4xl font-black font-mono text-teal-300">
               {upcomingMatches}
             </span>
-            <span className="text-[10px] font-mono text-teal-400">Scheduled</span>
+            <span className="text-[10px] font-mono text-teal-300 font-bold">Scheduled</span>
           </div>
         </div>
       </div>

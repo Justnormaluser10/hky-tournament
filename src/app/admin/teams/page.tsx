@@ -255,37 +255,38 @@ export default function AdminTeamsPage() {
   return (
     <div className="space-y-8 max-w-6xl mx-auto pb-16">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/15 pb-6">
         <div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-bold uppercase tracking-wider mb-2">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/25 border border-emerald-400/50 text-emerald-200 text-xs font-black uppercase tracking-wider mb-2 shadow-sm shadow-emerald-950/40">
             <Users className="w-3.5 h-3.5 text-amber-400" />
             Club Rosters & Management
           </div>
-          <h1 className="text-3xl font-black text-white uppercase tracking-tight">
+          <h1 className="text-3xl font-black text-white uppercase tracking-tight drop-shadow-sm">
             Team Management
           </h1>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs sm:text-sm text-slate-200 font-medium mt-1">
             Register clubs, designate official captains, set coaching staff, and manage player squads
           </p>
         </div>
 
         <button
           onClick={openAddModal}
-          className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-emerald-900/30 flex items-center gap-2 transition"
+          className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-500 hover:from-emerald-400 hover:via-teal-300 hover:to-emerald-400 text-white font-black text-xs uppercase tracking-wider shadow-lg shadow-emerald-500/40 hover:shadow-emerald-400/60 border-2 border-emerald-300/80 hover:border-emerald-200 flex items-center gap-2 transition-all duration-200 transform hover:-translate-y-0.5 active:translate-y-0"
         >
-          <Plus className="w-4 h-4" /> Add New Team
+          <Plus className="w-4 h-4 text-white stroke-[3] drop-shadow-sm" />
+          <span className="drop-shadow-sm">Add New Team</span>
         </button>
       </div>
 
       {actionSuccess && (
-        <div className="p-4 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-xs text-emerald-300 flex items-center gap-2">
+        <div className="p-4 rounded-xl bg-emerald-950/70 border border-emerald-400/50 text-xs font-bold text-emerald-200 flex items-center gap-2 shadow-lg">
           <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>{actionSuccess}</span>
         </div>
       )}
 
       {actionError && (
-        <div className="p-4 rounded-xl bg-rose-950/60 border border-rose-500/40 text-xs text-rose-300 flex items-center gap-2">
+        <div className="p-4 rounded-xl bg-rose-950/70 border border-rose-400/50 text-xs font-bold text-rose-200 flex items-center gap-2 shadow-lg">
           <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
           <span>{actionError}</span>
         </div>
@@ -295,14 +296,14 @@ export default function AdminTeamsPage() {
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-44 rounded-2xl bg-slate-900/40 animate-pulse border border-white/5" />
+            <div key={i} className="h-44 rounded-2xl bg-slate-900/60 animate-pulse border border-white/10" />
           ))}
         </div>
       ) : teams.length === 0 ? (
-        <div className="glass-card rounded-2xl p-12 text-center text-slate-400">
-          <Users className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-          <h3 className="text-base font-bold text-white uppercase">No teams registered yet</h3>
-          <p className="text-xs text-slate-400 mt-1">Click &ldquo;Add New Team&rdquo; to register the first club.</p>
+        <div className="glass-card rounded-2xl p-12 text-center text-slate-300">
+          <Users className="w-12 h-12 text-emerald-400 mx-auto mb-3" />
+          <h3 className="text-base font-black text-white uppercase">No teams registered yet</h3>
+          <p className="text-xs sm:text-sm text-slate-300 mt-1">Click &ldquo;Add New Team&rdquo; to register the first club.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -311,7 +312,7 @@ export default function AdminTeamsPage() {
             return (
               <div
                 key={t.id}
-                className="glass-card rounded-2xl p-6 border border-white/10 space-y-4 flex flex-col justify-between"
+                className="rounded-2xl p-6 bg-slate-900/85 backdrop-blur-md border border-white/20 hover:border-emerald-400/60 shadow-xl shadow-slate-950/50 space-y-4 flex flex-col justify-between transition-all duration-200"
               >
                 <div>
                   <div className="flex items-start justify-between gap-4">

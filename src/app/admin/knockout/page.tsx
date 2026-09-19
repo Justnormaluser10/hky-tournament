@@ -240,17 +240,17 @@ export default function AdminKnockoutPage() {
   return (
     <div className="space-y-8 max-w-6xl mx-auto pb-16">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/15 pb-6">
         <div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-bold uppercase tracking-wider mb-2">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/25 border border-emerald-400/50 text-emerald-200 text-xs font-black uppercase tracking-wider mb-2 shadow-sm shadow-emerald-950/40">
             <GitFork className="w-3.5 h-3.5 text-amber-400" />
             Playoff Bracket Architecture
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-white uppercase tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-black text-white uppercase tracking-tight drop-shadow-sm">
             Knockout Stages Management
           </h1>
-          <p className="text-xs text-slate-400 mt-1">
-            Current Stage: <strong className="text-emerald-400 uppercase">{tournamentStage}</strong>
+          <p className="text-xs sm:text-sm text-slate-200 font-medium mt-1">
+            Current Stage: <strong className="text-emerald-300 font-black uppercase">{tournamentStage}</strong>
             {leagueStatus && ` • League Completion: ${leagueStatus.completedMatches} / ${leagueStatus.scheduledMatches} (${leagueStatus.percentComplete}%)`}
           </p>
         </div>
@@ -260,8 +260,8 @@ export default function AdminKnockoutPage() {
           disabled={generating || (leagueStatus && !leagueStatus.isComplete)}
           className={`px-4 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider shadow-lg flex items-center justify-center gap-2 transition ${
             leagueStatus && !leagueStatus.isComplete
-              ? 'bg-slate-800 text-slate-400 border border-white/10 cursor-not-allowed opacity-60'
-              : 'bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white shadow-emerald-900/30'
+              ? 'bg-slate-800/90 text-slate-300 border-2 border-white/20 cursor-not-allowed opacity-75'
+              : 'bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-500 hover:from-emerald-400 hover:via-teal-300 hover:to-emerald-400 text-white shadow-emerald-500/40 border-2 border-emerald-300/80 hover:border-emerald-200'
           }`}
           title={
             leagueStatus && !leagueStatus.isComplete
@@ -273,7 +273,7 @@ export default function AdminKnockoutPage() {
             <span>🔒 Knockout Locked (League Incomplete)</span>
           ) : (
             <>
-              <RotateCcw className={`w-4 h-4 ${generating ? 'animate-spin' : ''}`} />
+              <RotateCcw className={`w-4 h-4 text-white ${generating ? 'animate-spin' : ''}`} />
               <span>{generating ? 'Seeding Bracket...' : '🏆 Seed / Re-seed Knockouts'}</span>
             </>
           )}

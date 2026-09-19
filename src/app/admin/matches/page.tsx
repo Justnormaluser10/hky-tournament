@@ -14,6 +14,7 @@ import {
   Sparkles,
   Play,
   RotateCcw,
+  Check,
 } from 'lucide-react';
 import { TeamLogo } from '@/components/ui/TeamLogo';
 
@@ -98,6 +99,10 @@ export default function AdminMatchesPage() {
   // Score & Match Edit Form
   const [scoreA, setScoreA] = useState(0);
   const [scoreB, setScoreB] = useState(0);
+  const [editTeamAId, setEditTeamAId] = useState('');
+  const [editTeamBId, setEditTeamBId] = useState('');
+  const [teamAPlayers, setTeamAPlayers] = useState<TeamPlayer[]>([]);
+  const [teamBPlayers, setTeamBPlayers] = useState<TeamPlayer[]>([]);
   const [matchStatus, setMatchStatus] = useState<string>('UPCOMING');
   const [matchDate, setMatchDate] = useState('');
   const [matchTime, setMatchTime] = useState('17:30');
@@ -110,7 +115,14 @@ export default function AdminMatchesPage() {
   const [eventPlayerId, setEventPlayerId] = useState('');
   const [eventType, setEventType] = useState('GOAL');
   const [eventMinute, setEventMinute] = useState(10);
-  const [availablePlayers, setAvailablePlayers] = useState<TeamPlayer[]>([]);
+
+  // Inline Match Event Editing State
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
+  const [editEvTeamId, setEditEvTeamId] = useState('');
+  const [editEvPlayerId, setEditEvPlayerId] = useState('');
+  const [editEvType, setEditEvType] = useState('GOAL');
+  const [editEvMinute, setEditEvMinute] = useState(10);
+  const [editEvNotes, setEditEvNotes] = useState('');
 
   // Create Form
   const [newTeamAId, setNewTeamAId] = useState('');
@@ -143,8 +155,44 @@ export default function AdminMatchesPage() {
     fetchMatchesAndTeams();
   }, []);
 
+  const loadPlayersForTeamA = async (tId: string) => {
+    if (!tId) {
+      setTeamAPlayers([]);
+      return;
+    }
+    try {
+      const res = await fetch(`/api/admin/players?teamId=${tId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setTeamAPlayers(data.players || []);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const loadPlayersForTeamB = async (tId: string) => {
+    if (!tId) {
+      setTeamBPlayers([]);
+      return;
+    }
+    try {
+      const res = await fetch(`/api/admin/players?teamId=${tId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setTeamBPlayers(data.players || []);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const openScoreModal = (m: Match) => {
     setScoreEditMatch(m);
+    const initialTeamA = m.teamAId || (teams.length >= 1 ? teams[0].id : '');
+    const initialTeamB = m.teamBId || (teams.length >= 2 ? teams[1].id : '');
+    setEditTeamAId(initialTeamA);
+    setEditTeamBId(initialTeamB);
     setScoreA(m.teamAScore);
     setScoreB(m.teamBScore);
     setMatchStatus(m.status);
@@ -152,35 +200,48 @@ export default function AdminMatchesPage() {
     setMatchTime(m.time);
     setMatchVenue(m.venue);
     setMatchNotes(m.notes || '');
-    setEventTeamId(m.teamAId || '');
-    if (m.teamAId) {
-      loadPlayersForTeam(m.teamAId);
-    } else {
-      setAvailablePlayers([]);
+    setEventTeamId(initialTeamA);
+    setEventPlayerId('');
+    setEditingEventId(null);
+    setActionError(null);
+
+    loadPlayersForTeamA(initialTeamA);
+    loadPlayersForTeamB(initialTeamB);
+  };
+
+  const handleTeamAChange = (newTId: string) => {
+    setEditTeamAId(newTId);
+    loadPlayersForTeamA(newTId);
+    if (eventTeamId === editTeamAId) {
+      setEventTeamId(newTId);
       setEventPlayerId('');
+    }
+    if (editEvTeamId === editTeamAId) {
+      setEditEvTeamId(newTId);
+      setEditEvPlayerId('');
     }
   };
 
-  const loadPlayersForTeam = async (tId: string) => {
-    try {
-      const res = await fetch(`/api/admin/players?teamId=${tId}`);
-      if (res.ok) {
-        const data = await res.json();
-        setAvailablePlayers(data.players || []);
-        if (data.players?.length > 0) {
-          setEventPlayerId(data.players[0].id);
-        } else {
-          setEventPlayerId('');
-        }
-      }
-    } catch (err) {
-      console.error(err);
+  const handleTeamBChange = (newTId: string) => {
+    setEditTeamBId(newTId);
+    loadPlayersForTeamB(newTId);
+    if (eventTeamId === editTeamBId) {
+      setEventTeamId(newTId);
+      setEventPlayerId('');
+    }
+    if (editEvTeamId === editTeamBId) {
+      setEditEvTeamId(newTId);
+      setEditEvPlayerId('');
     }
   };
 
   const handleScoreSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!scoreEditMatch) return;
+    if (editTeamAId && editTeamBId && editTeamAId === editTeamBId) {
+      setActionError('Home Team and Away Team cannot be the same team.');
+      return;
+    }
     setSubmitting(true);
     setActionError(null);
 
@@ -190,6 +251,8 @@ export default function AdminMatchesPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: scoreEditMatch.id,
+          teamAId: editTeamAId,
+          teamBId: editTeamBId,
           teamAScore: Number(scoreA),
           teamBScore: Number(scoreB),
           status: matchStatus,
@@ -202,10 +265,10 @@ export default function AdminMatchesPage() {
 
       const data = await res.json();
       if (!res.ok) {
-        setActionError(data.error || 'Failed to update match score.');
+        setActionError(data.error || 'Failed to update match.');
       } else {
         setActionSuccess(
-          `Match #${scoreEditMatch.matchNumber} score updated to ${scoreA}–${scoreB}. Standings and stats recalculated automatically.`
+          `Match #${scoreEditMatch.matchNumber} details and score updated successfully. Standings and stats recalculated.`
         );
         setScoreEditMatch(null);
         fetchMatchesAndTeams();
@@ -219,8 +282,38 @@ export default function AdminMatchesPage() {
 
   const handleAddEvent = async () => {
     if (!scoreEditMatch || !eventTeamId) return;
+    if (editTeamAId && editTeamBId && editTeamAId === editTeamBId) {
+      setActionError('Home Team and Away Team cannot be the same team.');
+      return;
+    }
+    setSubmitting(true);
+    setActionError(null);
 
     try {
+      // If teams were modified in the header, persist match updates first so backend validates against new teams
+      if (editTeamAId !== scoreEditMatch.teamAId || editTeamBId !== scoreEditMatch.teamBId) {
+        const teamSaveRes = await fetch('/api/admin/matches', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: scoreEditMatch.id,
+            teamAId: editTeamAId,
+            teamBId: editTeamBId,
+            status: matchStatus,
+            date: matchDate ? new Date(matchDate).toISOString() : undefined,
+            time: matchTime,
+            venue: matchVenue,
+            notes: matchNotes,
+          }),
+        });
+        if (!teamSaveRes.ok) {
+          const teamErr = await teamSaveRes.json();
+          setActionError(teamErr.error || 'Failed to update match teams before adding event.');
+          setSubmitting(false);
+          return;
+        }
+      }
+
       const res = await fetch(`/api/admin/matches/${scoreEditMatch.id}/events`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -233,9 +326,11 @@ export default function AdminMatchesPage() {
       });
 
       const data = await res.json();
-      if (res.ok) {
+      if (!res.ok) {
+        setActionError(data.error || 'Failed to add event.');
+      } else {
         setActionSuccess('Match event added.');
-        // Refresh match in modal
+        setEventPlayerId('');
         const refreshedRes = await fetch('/api/admin/matches');
         const refreshedData = await refreshedRes.json();
         const updated = refreshedData.matches.find((m: Match) => m.id === scoreEditMatch.id);
@@ -247,19 +342,95 @@ export default function AdminMatchesPage() {
         setMatches(refreshedData.matches || []);
       }
     } catch (err) {
-      console.error(err);
+      setActionError('An error occurred adding event.');
+    } finally {
+      setSubmitting(false);
     }
+  };
+
+  const handleUpdateEvent = async (eventId: string) => {
+    if (!scoreEditMatch) return;
+    setSubmitting(true);
+    setActionError(null);
+
+    try {
+      // If teams were modified in the header, persist match updates first
+      if (editTeamAId !== scoreEditMatch.teamAId || editTeamBId !== scoreEditMatch.teamBId) {
+        await fetch('/api/admin/matches', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: scoreEditMatch.id,
+            teamAId: editTeamAId,
+            teamBId: editTeamBId,
+            status: matchStatus,
+            date: matchDate ? new Date(matchDate).toISOString() : undefined,
+            time: matchTime,
+            venue: matchVenue,
+            notes: matchNotes,
+          }),
+        });
+      }
+
+      const res = await fetch(`/api/admin/matches/${scoreEditMatch.id}/events`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          eventId,
+          teamId: editEvTeamId,
+          playerId: editEvPlayerId || null,
+          type: editEvType,
+          minute: Number(editEvMinute),
+          notes: editEvNotes,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setActionError(data.error || 'Failed to update event.');
+      } else {
+        setActionSuccess('Match event updated successfully.');
+        setEditingEventId(null);
+        const refreshedRes = await fetch('/api/admin/matches');
+        const refreshedData = await refreshedRes.json();
+        const updated = refreshedData.matches.find((m: Match) => m.id === scoreEditMatch.id);
+        if (updated) {
+          setScoreEditMatch(updated);
+          setScoreA(updated.teamAScore);
+          setScoreB(updated.teamBScore);
+        }
+        setMatches(refreshedData.matches || []);
+      }
+    } catch (err) {
+      setActionError('An error occurred updating event.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const startEditingEvent = (evt: MatchEvent) => {
+    setEditingEventId(evt.id);
+    setEditEvTeamId(evt.team.id);
+    setEditEvPlayerId(evt.playerId || '');
+    setEditEvType(evt.type);
+    setEditEvMinute(evt.minute);
+    setEditEvNotes(evt.notes || '');
   };
 
   const handleDeleteEvent = async (eventId: string) => {
     if (!scoreEditMatch) return;
+    setSubmitting(true);
+    setActionError(null);
 
     try {
       const res = await fetch(`/api/admin/matches/${scoreEditMatch.id}/events?eventId=${eventId}`, {
         method: 'DELETE',
       });
 
-      if (res.ok) {
+      const data = await res.json();
+      if (!res.ok) {
+        setActionError(data.error || 'Failed to delete event.');
+      } else {
         setActionSuccess('Match event removed.');
         const refreshedRes = await fetch('/api/admin/matches');
         const refreshedData = await refreshedRes.json();
@@ -272,7 +443,9 @@ export default function AdminMatchesPage() {
         setMatches(refreshedData.matches || []);
       }
     } catch (err) {
-      console.error(err);
+      setActionError('An error occurred deleting event.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -361,25 +534,25 @@ export default function AdminMatchesPage() {
   return (
     <div className="space-y-8 max-w-6xl mx-auto pb-16">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/15 pb-6">
         <div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-bold uppercase tracking-wider mb-2">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/25 border border-emerald-400/50 text-emerald-200 text-xs font-black uppercase tracking-wider mb-2 shadow-sm shadow-emerald-950/40">
             <Calendar className="w-3.5 h-3.5 text-amber-400" />
             Match Operations & Score Recalculation
           </div>
-          <h1 className="text-3xl font-black text-white uppercase tracking-tight">
+          <h1 className="text-3xl font-black text-white uppercase tracking-tight drop-shadow-sm">
             Match Management
           </h1>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs sm:text-sm text-slate-200 font-medium mt-1">
             Schedule fixtures, edit scores, record goal events, and automatically update league standings
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2.5">
           <button
             onClick={handleGenerateFixtures}
             disabled={generating}
-            className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-emerald-500/30 text-emerald-300 font-bold text-xs uppercase tracking-wider transition flex items-center gap-2 shadow-sm disabled:opacity-50"
+            className="px-4 py-2.5 rounded-xl bg-slate-800/95 hover:bg-slate-700/95 border-2 border-emerald-400/70 text-emerald-200 hover:text-white font-black text-xs uppercase tracking-wider transition-all duration-200 flex items-center gap-2 shadow-md shadow-slate-950/60 hover:border-emerald-300 hover:shadow-emerald-900/40 active:scale-95 disabled:opacity-50"
           >
             <RotateCcw className="w-3.5 h-3.5" />
             {generating ? 'Generating...' : 'Auto-Generate Fixtures'}
@@ -393,22 +566,23 @@ export default function AdminMatchesPage() {
               }
               setIsCreateOpen(true);
             }}
-            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-emerald-900/30 flex items-center gap-2 transition"
+            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-500 hover:from-emerald-400 hover:via-teal-300 hover:to-emerald-400 text-white font-black text-xs uppercase tracking-wider shadow-lg shadow-emerald-500/40 hover:shadow-emerald-400/60 border-2 border-emerald-300/80 hover:border-emerald-200 flex items-center gap-2 transition-all duration-200 transform hover:-translate-y-0.5 active:translate-y-0"
           >
-            <Plus className="w-4 h-4" /> Schedule Match
+            <Plus className="w-4 h-4 text-white stroke-[3] drop-shadow-sm" />
+            <span className="drop-shadow-sm">Schedule Match</span>
           </button>
         </div>
       </div>
 
       {actionSuccess && (
-        <div className="p-4 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-xs text-emerald-300 flex items-center gap-2">
+        <div className="p-4 rounded-xl bg-emerald-950/70 border border-emerald-400/50 text-xs font-bold text-emerald-200 flex items-center gap-2 shadow-lg">
           <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>{actionSuccess}</span>
         </div>
       )}
 
       {actionError && (
-        <div className="p-4 rounded-xl bg-rose-950/60 border border-rose-500/40 text-xs text-rose-300 flex items-center gap-2">
+        <div className="p-4 rounded-xl bg-rose-950/70 border border-rose-400/50 text-xs font-bold text-rose-200 flex items-center gap-2 shadow-lg">
           <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
           <span>{actionError}</span>
         </div>
@@ -418,14 +592,14 @@ export default function AdminMatchesPage() {
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-44 rounded-2xl bg-slate-900/40 animate-pulse border border-white/5" />
+            <div key={i} className="h-44 rounded-2xl bg-slate-900/60 animate-pulse border border-white/10" />
           ))}
         </div>
       ) : matches.length === 0 ? (
-        <div className="glass-card rounded-2xl p-12 text-center text-slate-400">
-          <Calendar className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-          <h3 className="text-base font-bold text-white uppercase">No matches scheduled</h3>
-          <p className="text-xs text-slate-400 mt-1">
+        <div className="glass-card rounded-2xl p-12 text-center text-slate-300">
+          <Calendar className="w-12 h-12 text-emerald-400 mx-auto mb-3" />
+          <h3 className="text-base font-black text-white uppercase">No matches scheduled</h3>
+          <p className="text-xs sm:text-sm text-slate-300 mt-1">
             Click &ldquo;Auto-Generate Fixtures&rdquo; to create a round-robin schedule or &ldquo;Schedule Match&rdquo; manually.
           </p>
         </div>
@@ -436,15 +610,15 @@ export default function AdminMatchesPage() {
             return (
               <div
                 key={m.id}
-                className="glass-card rounded-2xl p-5 border border-white/10 flex flex-col justify-between space-y-4 hover:border-emerald-500/30 transition"
+                className="rounded-2xl p-5 bg-slate-900/85 backdrop-blur-md border border-white/20 flex flex-col justify-between space-y-4 hover:border-emerald-400/60 transition-all duration-200 shadow-xl shadow-slate-950/50"
               >
                 {/* Header */}
-                <div className="flex items-center justify-between border-b border-white/5 pb-2 text-xs">
+                <div className="flex items-center justify-between border-b border-white/10 pb-2.5 text-xs">
                   <div className="flex items-center gap-2">
-                    <span className="font-mono font-bold text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20">
+                    <span className="font-mono font-black text-amber-300 bg-amber-400/20 px-2.5 py-0.5 rounded border border-amber-400/40">
                       Match #{m.matchNumber}
                     </span>
-                    <span className="font-bold text-slate-400 uppercase">{m.round}</span>
+                    <span className="font-black text-slate-200 uppercase">{m.round}</span>
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -522,17 +696,17 @@ export default function AdminMatchesPage() {
                 </div>
 
                 {/* Footer and Edit Score CTA */}
-                <div className="pt-3 border-t border-white/5 flex items-center justify-between text-xs">
-                  <div className="text-[11px] text-slate-400 truncate max-w-[60%]">
+                <div className="pt-3 border-t border-white/10 flex items-center justify-between text-xs">
+                  <div className="text-xs text-slate-200 font-semibold truncate max-w-[60%]">
                     {m.time} • {m.venue}
                   </div>
 
                   <button
                     onClick={() => openScoreModal(m)}
-                    className="px-3.5 py-1.5 rounded-lg bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-600/40 font-bold uppercase tracking-wider text-[11px] transition flex items-center gap-1.5"
+                    className="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-300 hover:text-white border border-emerald-400/50 hover:border-emerald-300 font-extrabold uppercase tracking-wider text-[11px] transition-all flex items-center gap-1.5 shadow-sm"
                   >
-                    <Edit2 className="w-3 h-3" />
-                    <span>Edit Score & Events</span>
+                    <Edit2 className="w-3 h-3 text-emerald-400" />
+                    <span>Edit Match & Events</span>
                   </button>
                 </div>
               </div>
@@ -541,18 +715,19 @@ export default function AdminMatchesPage() {
         </div>
       )}
 
-      {/* SCORE & EVENTS EDIT MODAL (Single Source of Truth Recalculation) */}
+      {/* FULL MATCH & EVENTS EDIT MODAL */}
       {scoreEditMatch && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm overflow-y-auto">
-          <div className="relative w-full max-w-lg rounded-2xl bg-slate-900 border border-emerald-500/40 p-6 shadow-2xl space-y-6 my-8">
+          <div className="relative w-full max-w-xl rounded-2xl bg-slate-900 border border-emerald-500/40 p-6 shadow-2xl space-y-6 my-8 max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <div>
-                <h3 className="text-base font-black uppercase text-white tracking-wider">
-                  Edit Match #{scoreEditMatch.matchNumber} Score
+                <h3 className="text-base font-black uppercase text-white tracking-wider flex items-center gap-2">
+                  <Edit2 className="w-4 h-4 text-emerald-400" />
+                  Edit Match #{scoreEditMatch.matchNumber}
                 </h3>
                 <span className="text-xs text-slate-400">
-                  {scoreEditMatch.teamA?.name || scoreEditMatch.knockout?.seedLabelA || 'TBD'} vs{' '}
-                  {scoreEditMatch.teamB?.name || scoreEditMatch.knockout?.seedLabelB || 'TBD'}
+                  Update teams, schedule, venue, scores, and goal scorers
                 </span>
               </div>
               <button
@@ -564,16 +739,79 @@ export default function AdminMatchesPage() {
             </div>
 
             <form onSubmit={handleScoreSave} className="space-y-4">
-              {/* Score Input Controls */}
+              {/* TEAMS SELECTION */}
               <div className="p-4 rounded-xl bg-slate-950 border border-white/10 space-y-3">
-                <span className="text-[11px] font-bold uppercase text-amber-400 tracking-wider block">
-                  Official Match Scoreline
-                </span>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold uppercase text-emerald-400 tracking-wider block">
+                    Participating Teams
+                  </span>
+                  {editTeamAId && editTeamBId && editTeamAId === editTeamBId && (
+                    <span className="text-[11px] font-bold text-rose-400 animate-pulse">
+                      ⚠️ Teams must be different
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase text-slate-300 mb-1">
+                      Home Team (Team A) <span className="text-emerald-400">*</span>
+                    </label>
+                    <select
+                      value={editTeamAId}
+                      onChange={(e) => handleTeamAChange(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-white text-xs font-semibold focus:border-emerald-500 focus:outline-none"
+                    >
+                      {teams.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name} ({t.shortName})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase text-slate-300 mb-1">
+                      Away Team (Team B) <span className="text-emerald-400">*</span>
+                    </label>
+                    <select
+                      value={editTeamBId}
+                      onChange={(e) => handleTeamBChange(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-white text-xs font-semibold focus:border-emerald-500 focus:outline-none"
+                    >
+                      {teams.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name} ({t.shortName})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {editTeamAId && editTeamBId && editTeamAId === editTeamBId && (
+                  <p className="text-xs text-rose-400 font-medium">
+                    A team cannot play against itself. Please select two different teams.
+                  </p>
+                )}
+              </div>
+
+              {/* SCORE INPUT CONTROLS */}
+              <div className="p-4 rounded-xl bg-slate-950 border border-white/10 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold uppercase text-amber-400 tracking-wider block">
+                    Official Match Scoreline
+                  </span>
+                  {scoreEditMatch.events.filter((e) => e.type === 'GOAL').length > 0 && (
+                    <span className="text-[10px] font-mono text-emerald-300 bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+                      Synced with {scoreEditMatch.events.filter((e) => e.type === 'GOAL').length} goal event(s)
+                    </span>
+                  )}
+                </div>
 
                 <div className="grid grid-cols-2 gap-4 items-center text-center">
                   <div>
                     <span className="text-xs font-bold text-white block mb-1 truncate">
-                      {scoreEditMatch.teamA?.shortName || scoreEditMatch.teamA?.name || scoreEditMatch.knockout?.seedLabelA || 'Team A'}
+                      {teams.find((t) => t.id === editTeamAId)?.shortName || 'Home Team'}
                     </span>
                     <input
                       type="number"
@@ -586,7 +824,7 @@ export default function AdminMatchesPage() {
 
                   <div>
                     <span className="text-xs font-bold text-white block mb-1 truncate">
-                      {scoreEditMatch.teamB?.shortName || scoreEditMatch.teamB?.name || scoreEditMatch.knockout?.seedLabelB || 'Team B'}
+                      {teams.find((t) => t.id === editTeamBId)?.shortName || 'Away Team'}
                     </span>
                     <input
                       type="number"
@@ -655,24 +893,47 @@ export default function AdminMatchesPage() {
                 />
               </div>
 
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-300 mb-1">
+                  Notes (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={matchNotes}
+                  onChange={(e) => setMatchNotes(e.target.value)}
+                  placeholder="Fixture notes or details..."
+                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/10 text-white text-xs focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+
               {/* Save Match Score & Recalculate */}
               <button
                 type="submit"
-                disabled={submitting}
+                disabled={submitting || (editTeamAId === editTeamBId)}
                 className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-emerald-900/40 transition disabled:opacity-50"
               >
-                {submitting ? 'Recalculating...' : 'Save Score & Recalculate Standings'}
+                {submitting ? 'Saving Match...' : 'Save Match Details & Recalculate'}
               </button>
             </form>
 
             {/* RECORD MATCH EVENTS (GOALS / CARDS) */}
             <div className="pt-4 border-t border-white/10 space-y-4">
-              <h4 className="text-xs font-black uppercase tracking-wider text-slate-300">
-                Match Goal & Card Events
-              </h4>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-xs font-black uppercase tracking-wider text-slate-200">
+                    Match Goal & Card Events
+                  </h4>
+                  <p className="text-[11px] text-slate-400">
+                    Add, edit, or remove goals. Scores and statistics update automatically.
+                  </p>
+                </div>
+              </div>
 
               {/* Add event row */}
-              <div className="p-3 rounded-xl bg-slate-950/60 border border-white/5 space-y-3">
+              <div className="p-3.5 rounded-xl bg-slate-950/80 border border-white/10 space-y-3">
+                <span className="text-[10px] font-bold uppercase text-amber-400 tracking-wider block">
+                  + Record New Event
+                </span>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                   {/* Select Team */}
                   <div>
@@ -681,16 +942,16 @@ export default function AdminMatchesPage() {
                       value={eventTeamId}
                       onChange={(e) => {
                         setEventTeamId(e.target.value);
-                        loadPlayersForTeam(e.target.value);
+                        setEventPlayerId('');
                       }}
                       className="w-full px-2 py-1.5 rounded-lg bg-slate-900 border border-white/10 text-white text-xs"
                     >
-                      {scoreEditMatch.teamA && (
-                        <option value={scoreEditMatch.teamAId || ''}>{scoreEditMatch.teamA.shortName}</option>
-                      )}
-                      {scoreEditMatch.teamB && (
-                        <option value={scoreEditMatch.teamBId || ''}>{scoreEditMatch.teamB.shortName}</option>
-                      )}
+                      <option value={editTeamAId}>
+                        {teams.find((t) => t.id === editTeamAId)?.shortName || 'Home Team'}
+                      </option>
+                      <option value={editTeamBId}>
+                        {teams.find((t) => t.id === editTeamBId)?.shortName || 'Away Team'}
+                      </option>
                     </select>
                   </div>
 
@@ -717,10 +978,10 @@ export default function AdminMatchesPage() {
                       onChange={(e) => setEventPlayerId(e.target.value)}
                       className="w-full px-2 py-1.5 rounded-lg bg-slate-900 border border-white/10 text-white text-xs truncate"
                     >
-                      <option value="">-- Optional Player --</option>
-                      {availablePlayers.map((p) => (
+                      <option value="">-- Optional / Team Goal --</option>
+                      {(eventTeamId === editTeamBId ? teamBPlayers : teamAPlayers).map((p) => (
                         <option key={p.id} value={p.id}>
-                          #{p.jerseyNumber} {p.name}
+                          #{p.jerseyNumber} {p.name} ({p.position})
                         </option>
                       ))}
                     </select>
@@ -732,7 +993,7 @@ export default function AdminMatchesPage() {
                     <input
                       type="number"
                       min={1}
-                      max={50}
+                      max={100}
                       value={eventMinute}
                       onChange={(e) => setEventMinute(Number(e.target.value))}
                       className="w-full px-2 py-1.5 rounded-lg bg-slate-900 border border-white/10 text-white text-xs font-mono"
@@ -743,43 +1004,182 @@ export default function AdminMatchesPage() {
                 <button
                   type="button"
                   onClick={handleAddEvent}
-                  className="w-full py-2 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:bg-amber-500/30 text-xs font-bold uppercase transition"
+                  disabled={submitting || (editTeamAId === editTeamBId)}
+                  className="w-full py-2 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:bg-amber-500/30 text-xs font-bold uppercase transition disabled:opacity-50"
                 >
                   + Add Event to Match
                 </button>
               </div>
 
               {/* Events List */}
-              <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+              <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
                 {scoreEditMatch.events.length === 0 ? (
-                  <p className="text-xs text-slate-500 text-center py-2">No events recorded.</p>
+                  <p className="text-xs text-slate-500 text-center py-3 bg-slate-950/40 rounded-xl border border-white/5">
+                    No events recorded for this match yet.
+                  </p>
                 ) : (
-                  scoreEditMatch.events.map((evt) => (
-                    <div
-                      key={evt.id}
-                      className="flex items-center justify-between p-2 rounded-lg bg-slate-950 border border-white/5 text-xs"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-amber-400 font-bold">{evt.minute}&apos;</span>
-                        <span>{evt.type === 'GOAL' ? '⚽' : '🟨'}</span>
-                        <span className="font-bold text-white">
-                          {evt.player ? evt.player.name : evt.team.shortName}
-                        </span>
-                        <span className="text-[10px] text-slate-400 font-mono">
-                          ({evt.team.shortName})
-                        </span>
-                      </div>
+                  scoreEditMatch.events.map((evt) => {
+                    const isEditing = editingEventId === evt.id;
 
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteEvent(evt.id)}
-                        className="text-rose-400 hover:text-rose-300 p-1"
-                        title="Remove Event"
+                    if (isEditing) {
+                      return (
+                        <div
+                          key={evt.id}
+                          className="p-3 rounded-xl bg-slate-950 border border-emerald-500/60 space-y-2.5 shadow-lg"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] uppercase font-bold text-emerald-400">
+                              Edit Event
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setEditingEventId(null)}
+                              className="text-slate-400 hover:text-white text-xs"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                            <div>
+                              <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">
+                                Team
+                              </label>
+                              <select
+                                value={editEvTeamId}
+                                onChange={(e) => {
+                                  setEditEvTeamId(e.target.value);
+                                  setEditEvPlayerId('');
+                                }}
+                                className="w-full px-2 py-1.5 rounded-lg bg-slate-900 border border-white/10 text-white text-xs"
+                              >
+                                <option value={editTeamAId}>
+                                  {teams.find((t) => t.id === editTeamAId)?.shortName || 'Home Team'}
+                                </option>
+                                <option value={editTeamBId}>
+                                  {teams.find((t) => t.id === editTeamBId)?.shortName || 'Away Team'}
+                                </option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">
+                                Type
+                              </label>
+                              <select
+                                value={editEvType}
+                                onChange={(e) => setEditEvType(e.target.value)}
+                                className="w-full px-2 py-1.5 rounded-lg bg-slate-900 border border-white/10 text-white text-xs"
+                              >
+                                <option value="GOAL">⚽ Goal</option>
+                                <option value="YELLOW_CARD">🟨 Yellow Card</option>
+                                <option value="RED_CARD">🟥 Red Card</option>
+                                <option value="GREEN_CARD">🟩 Green Card</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">
+                                Scorer / Player
+                              </label>
+                              <select
+                                value={editEvPlayerId}
+                                onChange={(e) => setEditEvPlayerId(e.target.value)}
+                                className="w-full px-2 py-1.5 rounded-lg bg-slate-900 border border-white/10 text-white text-xs truncate"
+                              >
+                                <option value="">-- Optional / Team Goal --</option>
+                                {(editEvTeamId === editTeamBId ? teamBPlayers : teamAPlayers).map((p) => (
+                                  <option key={p.id} value={p.id}>
+                                    #{p.jerseyNumber} {p.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">
+                                Minute (&apos;)
+                              </label>
+                              <input
+                                type="number"
+                                min={1}
+                                max={100}
+                                value={editEvMinute}
+                                onChange={(e) => setEditEvMinute(Number(e.target.value))}
+                                className="w-full px-2 py-1.5 rounded-lg bg-slate-900 border border-white/10 text-white text-xs font-mono"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="flex justify-end gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => setEditingEventId(null)}
+                              className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white text-xs font-bold"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateEvent(evt.id)}
+                              disabled={submitting}
+                              className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 shadow"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                              Save Changes
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div
+                        key={evt.id}
+                        className="flex items-center justify-between p-2.5 rounded-lg bg-slate-950 border border-white/5 hover:border-white/15 text-xs transition"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ))
+                        <div className="flex items-center gap-2.5">
+                          <span className="font-mono text-amber-400 font-bold bg-amber-400/10 px-1.5 py-0.5 rounded border border-amber-400/20">
+                            {evt.minute}&apos;
+                          </span>
+                          <span className="text-sm">
+                            {evt.type === 'GOAL'
+                              ? '⚽'
+                              : evt.type === 'YELLOW_CARD'
+                              ? '🟨'
+                              : evt.type === 'RED_CARD'
+                              ? '🟥'
+                              : '🟩'}
+                          </span>
+                          <span className="font-bold text-white">
+                            {evt.player ? `#${evt.player.jerseyNumber} ${evt.player.name}` : evt.team.shortName}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-mono bg-slate-900 px-1.5 py-0.5 rounded">
+                            {evt.team.shortName}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => startEditingEvent(evt)}
+                            className="p-1 rounded text-slate-400 hover:text-emerald-400 transition"
+                            title="Edit Event"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteEvent(evt.id)}
+                            className="p-1 rounded text-slate-400 hover:text-rose-400 transition"
+                            title="Remove Event"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
                 )}
               </div>
             </div>

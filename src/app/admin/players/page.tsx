@@ -209,53 +209,54 @@ export default function AdminPlayersPage() {
   return (
     <div className="space-y-8 max-w-6xl mx-auto pb-16">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/15 pb-6">
         <div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-bold uppercase tracking-wider mb-2">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/25 border border-emerald-400/50 text-emerald-200 text-xs font-black uppercase tracking-wider mb-2 shadow-sm shadow-emerald-950/40">
             <UserCheck className="w-3.5 h-3.5 text-amber-400" />
             Central Player Registry
           </div>
-          <h1 className="text-3xl font-black text-white uppercase tracking-tight">
+          <h1 className="text-3xl font-black text-white uppercase tracking-tight drop-shadow-sm">
             Player Management
           </h1>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs sm:text-sm text-slate-200 font-medium mt-1">
             Maintain registered field hockey athletes, jersey allocations, and positions
           </p>
         </div>
 
         <button
           onClick={openAddModal}
-          className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-emerald-900/30 flex items-center gap-2 transition"
+          className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-500 hover:from-emerald-400 hover:via-teal-300 hover:to-emerald-400 text-white font-black text-xs uppercase tracking-wider shadow-lg shadow-emerald-500/40 hover:shadow-emerald-400/60 border-2 border-emerald-300/80 hover:border-emerald-200 flex items-center gap-2 transition-all duration-200 transform hover:-translate-y-0.5 active:translate-y-0"
         >
-          <Plus className="w-4 h-4" /> Add Player
+          <Plus className="w-4 h-4 text-white stroke-[3] drop-shadow-sm" />
+          <span className="drop-shadow-sm">Add Player</span>
         </button>
       </div>
 
       {actionSuccess && (
-        <div className="p-4 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-xs text-emerald-300 flex items-center gap-2">
+        <div className="p-4 rounded-xl bg-emerald-950/70 border border-emerald-400/50 text-xs font-bold text-emerald-200 flex items-center gap-2 shadow-lg">
           <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>{actionSuccess}</span>
         </div>
       )}
 
       {actionError && (
-        <div className="p-4 rounded-xl bg-rose-950/60 border border-rose-500/40 text-xs text-rose-300 flex items-center gap-2">
+        <div className="p-4 rounded-xl bg-rose-950/70 border border-rose-400/50 text-xs font-bold text-rose-200 flex items-center gap-2 shadow-lg">
           <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
           <span>{actionError}</span>
         </div>
       )}
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-4 p-4 rounded-2xl bg-slate-900/60 border border-white/10 text-xs">
+      <div className="flex flex-wrap items-center gap-4 p-4 rounded-2xl bg-slate-900/85 backdrop-blur-md border border-white/20 text-xs shadow-lg">
         <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-slate-400" />
-          <span className="font-bold text-slate-300 uppercase">Filter:</span>
+          <Filter className="w-4 h-4 text-emerald-400" />
+          <span className="font-bold text-slate-200 uppercase">Filter:</span>
         </div>
 
         <select
           value={selectedTeamFilter}
           onChange={(e) => setSelectedTeamFilter(e.target.value)}
-          className="px-3 py-1.5 rounded-xl bg-slate-950 border border-white/10 text-white text-xs focus:outline-none"
+          className="px-3 py-1.5 rounded-xl bg-slate-950 border border-white/20 text-white text-xs focus:border-emerald-400 focus:outline-none"
         >
           <option value="">All Teams ({teams.length})</option>
           {teams.map((t) => (
@@ -268,7 +269,7 @@ export default function AdminPlayersPage() {
         <select
           value={selectedPositionFilter}
           onChange={(e) => setSelectedPositionFilter(e.target.value)}
-          className="px-3 py-1.5 rounded-xl bg-slate-950 border border-white/10 text-white text-xs focus:outline-none"
+          className="px-3 py-1.5 rounded-xl bg-slate-950 border border-white/20 text-white text-xs focus:border-emerald-400 focus:outline-none"
         >
           <option value="">All Positions</option>
           <option value="GOALKEEPER">Goalkeeper</option>
@@ -278,16 +279,16 @@ export default function AdminPlayersPage() {
           <option value="UTILITY">Utility</option>
         </select>
 
-        <span className="ml-auto text-slate-500 font-mono">
+        <span className="ml-auto text-slate-300 font-mono font-semibold">
           Showing {filteredPlayers.length} of {players.length} Players
         </span>
       </div>
 
       {/* Players Table */}
-      <div className="glass-card rounded-2xl overflow-hidden border border-white/10 shadow-xl">
+      <div className="rounded-2xl overflow-hidden bg-slate-900/85 backdrop-blur-md border border-white/20 shadow-xl shadow-slate-950/50">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-300">
-            <thead className="bg-slate-900/90 text-slate-400 font-bold uppercase text-[11px] tracking-wider border-b border-white/10">
+          <table className="w-full text-left text-xs text-slate-200">
+            <thead className="bg-slate-950/90 text-slate-200 font-black uppercase text-[11px] tracking-wider border-b border-white/15">
               <tr>
                 <th className="py-3.5 px-4 text-center">#</th>
                 <th className="py-3.5 px-4">Player</th>

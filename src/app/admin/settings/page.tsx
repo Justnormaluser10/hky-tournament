@@ -83,21 +83,21 @@ export default function AdminSettingsPage() {
   return (
     <div className="space-y-10 max-w-4xl mx-auto pb-16">
       {/* Header */}
-      <div className="border-b border-white/10 pb-6">
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-bold uppercase tracking-wider mb-2">
+      <div className="border-b border-white/15 pb-6">
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/25 border border-emerald-400/50 text-emerald-200 text-xs font-black uppercase tracking-wider mb-2 shadow-sm shadow-emerald-950/40">
           <Settings2 className="w-3.5 h-3.5 text-amber-400" />
           Platform Administration
         </div>
-        <h1 className="text-3xl font-black text-white uppercase tracking-tight">
+        <h1 className="text-3xl font-black text-white uppercase tracking-tight drop-shadow-sm">
           System Settings
         </h1>
-        <p className="text-xs text-slate-400 mt-1">
+        <p className="text-xs sm:text-sm text-slate-200 font-medium mt-1">
           Admin credential security and database maintenance operations
         </p>
       </div>
 
       {/* Password Update Card */}
-      <div className="glass-card rounded-2xl p-6 sm:p-8 space-y-5 border-emerald-500/20">
+      <div className="rounded-2xl p-6 sm:p-8 space-y-5 bg-slate-900/85 backdrop-blur-md border border-white/20 shadow-xl shadow-slate-950/50">
         <div className="flex items-center gap-3">
           <div className="p-2.5 rounded-xl bg-emerald-500/20 text-emerald-400">
             <Lock className="w-5 h-5" />
@@ -106,21 +106,21 @@ export default function AdminSettingsPage() {
             <h2 className="text-lg font-black uppercase text-white tracking-wide">
               Change Admin Password
             </h2>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs sm:text-sm text-slate-200 mt-0.5">
               Update password for the master tournament director account
             </p>
           </div>
         </div>
 
         {passwordSuccess && (
-          <div className="p-3.5 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-xs text-emerald-300 flex items-center gap-2">
+          <div className="p-3.5 rounded-xl bg-emerald-950/70 border border-emerald-400/50 text-xs font-bold text-emerald-200 flex items-center gap-2 shadow-lg">
             <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
             <span>{passwordSuccess}</span>
           </div>
         )}
 
         {passwordError && (
-          <div className="p-3.5 rounded-xl bg-rose-950/60 border border-rose-500/40 text-xs text-rose-300 flex items-center gap-2">
+          <div className="p-3.5 rounded-xl bg-rose-950/70 border border-rose-400/50 text-xs font-bold text-rose-200 flex items-center gap-2 shadow-lg">
             <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
             <span>{passwordError}</span>
           </div>
@@ -128,7 +128,7 @@ export default function AdminSettingsPage() {
 
         <form onSubmit={handlePasswordChange} className="space-y-4 max-w-md">
           <div>
-            <label className="block text-xs font-bold uppercase text-slate-300 mb-1">
+            <label className="block text-xs font-bold uppercase text-slate-200 mb-1">
               Current Password
             </label>
             <input
@@ -137,13 +137,13 @@ export default function AdminSettingsPage() {
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
               placeholder="••••••••"
-              className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-white/10 text-white text-xs focus:border-emerald-500 focus:outline-none"
+              className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-white/20 text-white text-xs focus:border-emerald-400 focus:outline-none"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-bold uppercase text-slate-300 mb-1">
-              New Password (Min 6 Chars)
+            <label className="block text-xs font-bold uppercase text-slate-200 mb-1">
+              New Password (Min. 6 chars)
             </label>
             <input
               type="password"
@@ -152,12 +152,12 @@ export default function AdminSettingsPage() {
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               placeholder="••••••••"
-              className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-white/10 text-white text-xs focus:border-emerald-500 focus:outline-none"
+              className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-white/20 text-white text-xs focus:border-emerald-400 focus:outline-none"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-bold uppercase text-slate-300 mb-1">
+            <label className="block text-xs font-bold uppercase text-slate-200 mb-1">
               Confirm New Password
             </label>
             <input
@@ -167,14 +167,14 @@ export default function AdminSettingsPage() {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="••••••••"
-              className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-white/10 text-white text-xs focus:border-emerald-500 focus:outline-none"
+              className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-white/20 text-white text-xs focus:border-emerald-400 focus:outline-none"
             />
           </div>
 
           <button
             type="submit"
             disabled={updatingPassword}
-            className="py-2.5 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-emerald-900/30 transition disabled:opacity-50"
+            className="py-2.5 px-6 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-500 hover:from-emerald-400 hover:via-teal-300 hover:to-emerald-400 text-white font-black text-xs uppercase tracking-wider shadow-lg shadow-emerald-500/40 hover:shadow-emerald-400/60 border-2 border-emerald-300/80 hover:border-emerald-200 transition-all duration-200 transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50"
           >
             {updatingPassword ? 'Updating...' : 'Update Password'}
           </button>

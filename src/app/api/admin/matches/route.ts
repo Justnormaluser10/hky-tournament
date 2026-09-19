@@ -115,24 +115,95 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Match not found.' }, { status: 404 });
     }
 
-    const newTeamAScore = teamAScore !== undefined ? Number(teamAScore) : currentMatch.teamAScore;
-    const newTeamBScore = teamBScore !== undefined ? Number(teamBScore) : currentMatch.teamBScore;
+    const finalTeamAId = teamAId !== undefined ? teamAId : currentMatch.teamAId;
+    const finalTeamBId = teamBId !== undefined ? teamBId : currentMatch.teamBId;
+
+    if (finalTeamAId && finalTeamBId && finalTeamAId === finalTeamBId) {
+      return NextResponse.json(
+        { error: 'Home team and away team cannot be the same team.' },
+        { status: 400 }
+      );
+    }
+
+    if (finalTeamAId) {
+      const teamA = await prisma.team.findUnique({ where: { id: finalTeamAId } });
+      if (!teamA) {
+        return NextResponse.json({ error: 'Home team not found.' }, { status: 404 });
+      }
+    }
+    if (finalTeamBId) {
+      const teamB = await prisma.team.findUnique({ where: { id: finalTeamBId } });
+      if (!teamB) {
+        return NextResponse.json({ error: 'Away team not found.' }, { status: 404 });
+      }
+    }
+
+    const teamsChanged =
+      (teamAId !== undefined && teamAId !== currentMatch.teamAId) ||
+      (teamBId !== undefined && teamBId !== currentMatch.teamBId);
+
+    if (teamsChanged) {
+      // Remove any events belonging to teams that are no longer part of this match
+      const validTeamIds = [finalTeamAId, finalTeamBId].filter(Boolean) as string[];
+      await prisma.matchEvent.deleteMany({
+        where: {
+          matchId: id,
+          teamId: { notIn: validTeamIds },
+        },
+      });
+
+      // Clean up any event where playerId no longer matches the event's team
+      const remainingEvents = await prisma.matchEvent.findMany({
+        where: { matchId: id },
+        include: { player: true },
+      });
+
+      for (const ev of remainingEvents) {
+        if (ev.playerId && ev.player && ev.player.teamId !== ev.teamId) {
+          await prisma.matchEvent.update({
+            where: { id: ev.id },
+            data: { playerId: null },
+          });
+        }
+      }
+    }
+
+    // Recalculate score from goal events if events exist, otherwise use submitted scores
+    const goalEvents = await prisma.matchEvent.findMany({
+      where: { matchId: id, type: 'GOAL' },
+    });
+
+    let newTeamAScore: number;
+    let newTeamBScore: number;
+
+    if (goalEvents.length > 0) {
+      newTeamAScore = finalTeamAId
+        ? goalEvents.filter((e) => e.teamId === finalTeamAId).length
+        : 0;
+      newTeamBScore = finalTeamBId
+        ? goalEvents.filter((e) => e.teamId === finalTeamBId).length
+        : 0;
+    } else {
+      newTeamAScore = teamAScore !== undefined ? Number(teamAScore) : currentMatch.teamAScore;
+      newTeamBScore = teamBScore !== undefined ? Number(teamBScore) : currentMatch.teamBScore;
+    }
+
     const newStatus = status !== undefined ? status : currentMatch.status;
 
     let winnerId: string | null = null;
     if (newStatus === 'COMPLETED') {
       if (newTeamAScore > newTeamBScore) {
-        winnerId = teamAId || currentMatch.teamAId;
+        winnerId = finalTeamAId || currentMatch.teamAId;
       } else if (newTeamBScore > newTeamAScore) {
-        winnerId = teamBId || currentMatch.teamBId;
+        winnerId = finalTeamBId || currentMatch.teamBId;
       }
     }
 
     const updated = await prisma.match.update({
       where: { id },
       data: {
-        teamAId: teamAId || undefined,
-        teamBId: teamBId || undefined,
+        teamAId: finalTeamAId || null,
+        teamBId: finalTeamBId || null,
         teamAScore: newTeamAScore,
         teamBScore: newTeamBScore,
         status: newStatus,
@@ -144,8 +215,15 @@ export async function PUT(req: NextRequest) {
         notes: notes !== undefined ? notes : undefined,
       },
       include: {
-        teamA: { select: { name: true, shortName: true } },
-        teamB: { select: { name: true, shortName: true } },
+        teamA: { select: { id: true, name: true, shortName: true } },
+        teamB: { select: { id: true, name: true, shortName: true } },
+        events: {
+          include: {
+            player: { select: { id: true, name: true, jerseyNumber: true } },
+            team: { select: { id: true, shortName: true } },
+          },
+          orderBy: { minute: 'asc' },
+        },
       },
     });
 
@@ -189,7 +267,15 @@ export async function PUT(req: NextRequest) {
       console.warn('League completion check warning:', e);
     }
 
-    // Comprehensive Activity Logging (Score correction / match edit)
+    // Comprehensive Activity Logging
+    if (teamsChanged) {
+      await logActivity(
+        auth.admin.email,
+        'MATCH_TEAMS_CHANGED',
+        `Admin changed Match #${updated.matchNumber} teams to ${updated.teamA?.name || 'TBD'} vs ${updated.teamB?.name || 'TBD'}.`
+      );
+    }
+
     const scoreChanged =
       currentMatch.teamAScore !== updated.teamAScore || currentMatch.teamBScore !== updated.teamBScore;
 
@@ -199,7 +285,7 @@ export async function PUT(req: NextRequest) {
         'SCORE_EDITED',
         `Admin changed Match #${updated.matchNumber} (${updated.teamA?.name || 'TBD'} vs ${updated.teamB?.name || 'TBD'}) score from ${currentMatch.teamAScore}–${currentMatch.teamBScore} to ${updated.teamAScore}–${updated.teamBScore}. (Status: ${updated.status})`
       );
-    } else {
+    } else if (!teamsChanged) {
       await logActivity(
         auth.admin.email,
         'MATCH_UPDATED',

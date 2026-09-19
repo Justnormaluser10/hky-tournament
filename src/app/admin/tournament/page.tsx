@@ -106,37 +106,37 @@ export default function AdminTournamentConfigPage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-16">
-      <div className="border-b border-white/10 pb-6">
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-bold uppercase tracking-wider mb-2">
+      <div className="border-b border-white/15 pb-6">
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/25 border border-emerald-400/50 text-emerald-200 text-xs font-black uppercase tracking-wider mb-2 shadow-sm shadow-emerald-950/40">
           <Settings2 className="w-3.5 h-3.5 text-amber-400" />
           Master Settings
         </div>
-        <h1 className="text-3xl font-black text-white uppercase tracking-tight">
+        <h1 className="text-3xl font-black text-white uppercase tracking-tight drop-shadow-sm">
           Tournament Configuration
         </h1>
-        <p className="text-xs text-slate-400 mt-1">
+        <p className="text-xs sm:text-sm text-slate-200 font-medium mt-1">
           Customize tournament branding, playing format, points calculation, and playoff rules
         </p>
       </div>
 
       {message && (
-        <div className="p-4 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-xs text-emerald-300 flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+        <div className="p-4 rounded-xl bg-emerald-950/70 border border-emerald-400/50 text-xs font-bold text-emerald-200 flex items-center gap-2 shadow-lg">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>{message}</span>
         </div>
       )}
 
       {error && (
-        <div className="p-4 rounded-xl bg-rose-950/60 border border-rose-500/40 text-xs text-rose-300 flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 text-rose-400" />
+        <div className="p-4 rounded-xl bg-rose-950/70 border border-rose-400/50 text-xs font-bold text-rose-200 flex items-center gap-2 shadow-lg">
+          <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
-      <form onSubmit={handleSave} className="glass-card rounded-2xl p-6 sm:p-8 space-y-6">
+      <form onSubmit={handleSave} className="rounded-2xl p-6 sm:p-8 space-y-6 bg-slate-900/85 backdrop-blur-md border border-white/20 shadow-xl shadow-slate-950/50">
         {/* Basic Branding */}
         <div className="space-y-4">
-          <h2 className="text-xs font-black uppercase text-emerald-400 tracking-wider">
+          <h2 className="text-xs font-black uppercase text-emerald-300 tracking-wider">
             1. Official Identity & Location
           </h2>
 
@@ -340,14 +340,14 @@ export default function AdminTournamentConfigPage() {
         </div>
 
         {/* Submit */}
-        <div className="pt-6 border-t border-white/10 flex justify-end">
+        <div className="pt-6 border-t border-white/15 flex justify-end">
           <button
             type="submit"
             disabled={saving}
-            className="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-emerald-900/30 flex items-center gap-2 transition disabled:opacity-50"
+            className="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-500 hover:from-emerald-400 hover:via-teal-300 hover:to-emerald-400 text-white font-black text-xs uppercase tracking-wider shadow-lg shadow-emerald-500/40 hover:shadow-emerald-400/60 border-2 border-emerald-300/80 hover:border-emerald-200 flex items-center gap-2 transition-all duration-200 transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50"
           >
-            <Save className="w-4 h-4" />
-            {saving ? 'Saving Configuration...' : 'Save Configuration'}
+            <Save className="w-4 h-4 text-white stroke-[2.5]" />
+            <span>{saving ? 'Saving Configuration...' : 'Save Configuration'}</span>
           </button>
         </div>
       </form>

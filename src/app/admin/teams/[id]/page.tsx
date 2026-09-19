@@ -305,7 +305,7 @@ export default function AdminTeamSquadPage({
       </Link>
 
       {/* Team Banner */}
-      <div className="glass-card rounded-2xl p-6 sm:p-8 flex flex-col sm:flex-row items-center sm:items-start justify-between gap-6 border-emerald-500/30">
+      <div className="rounded-2xl p-6 sm:p-8 flex flex-col sm:flex-row items-center sm:items-start justify-between gap-6 bg-slate-900/85 backdrop-blur-md border border-white/20 shadow-xl shadow-slate-950/50">
         <div className="flex items-center gap-4">
           <TeamLogo
             name={team.name}
@@ -315,38 +315,39 @@ export default function AdminTeamSquadPage({
             size="xl"
           />
           <div>
-            <h1 className="text-2xl sm:text-3xl font-black text-white uppercase">
+            <h1 className="text-2xl sm:text-3xl font-black text-white uppercase drop-shadow-sm">
               {team.name}
             </h1>
-            <p className="text-xs text-slate-400 mt-1">
-              Coach: <strong className="text-slate-200">{team.coach || 'None'}</strong> •
+            <p className="text-xs sm:text-sm text-slate-200 mt-1">
+              Coach: <strong className="text-white font-bold">{team.coach || 'None'}</strong> •
               Captain:{' '}
-              <strong className="text-amber-400">
+              <strong className="text-amber-300 font-black">
                 {captain ? `${captain.name} (#${captain.jerseyNumber})` : 'Not assigned'}
               </strong>
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2.5 shrink-0">
           <button
             onClick={openLogoModal}
-            className="px-3.5 py-2.5 rounded-xl bg-slate-900 border border-white/10 hover:border-emerald-500/40 text-slate-300 hover:text-white font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 transition"
+            className="px-3.5 py-2.5 rounded-xl bg-slate-800/90 border-2 border-emerald-400/60 hover:border-emerald-300 text-slate-100 hover:text-white font-black text-xs uppercase tracking-wider flex items-center gap-1.5 transition shadow-sm"
           >
             <UploadCloud className="w-4 h-4 text-emerald-400" />
             <span>Change Logo</span>
           </button>
           <button
             onClick={openAddModal}
-            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-emerald-900/30 flex items-center gap-2 transition shrink-0"
+            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-500 hover:from-emerald-400 hover:via-teal-300 hover:to-emerald-400 text-white font-black text-xs uppercase tracking-wider shadow-lg shadow-emerald-500/40 hover:shadow-emerald-400/60 border-2 border-emerald-300/80 hover:border-emerald-200 flex items-center gap-2 transition-all duration-200 transform hover:-translate-y-0.5 active:translate-y-0 shrink-0"
           >
-            <Plus className="w-4 h-4" /> + Add Player to Squad
+            <Plus className="w-4 h-4 text-white stroke-[3] drop-shadow-sm" />
+            <span className="drop-shadow-sm">+ Add Player to Squad</span>
           </button>
         </div>
       </div>
 
       {actionSuccess && (
-        <div className="p-4 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-xs text-emerald-300 flex items-center gap-2">
+        <div className="p-4 rounded-xl bg-emerald-950/70 border border-emerald-400/50 text-xs font-bold text-emerald-200 flex items-center gap-2 shadow-lg">
           <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>{actionSuccess}</span>
         </div>

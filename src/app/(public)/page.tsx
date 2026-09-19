@@ -196,13 +196,13 @@ export default async function HomePage() {
     <div className="space-y-8 sm:space-y-12 pb-16">
       {/* 1. HERO SECTION (MOBILE-FIRST SPORTS BROADCAST FEEL) */}
       <section className="relative pt-6 sm:pt-10 pb-8 sm:pb-12 px-4 sm:px-6 lg:px-8 overflow-hidden">
-        {/* Background Field Hockey Stadium Photo with Deep Dark Contrast Overlay */}
+        {/* Background Field Hockey Stadium Photo with Dynamic Floodlight Illumination */}
         <div
-          className="absolute inset-0 bg-cover bg-center pointer-events-none opacity-25 mix-blend-luminosity scale-105"
+          className="absolute inset-0 bg-cover bg-center pointer-events-none opacity-45 scale-105"
           style={{ backgroundImage: "url('/images/hockey-stadium-blue.jpg')" }}
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#040814]/85 via-[#040814]/90 to-[#040814] pointer-events-none" />
-        <div className="absolute -top-20 left-1/2 -translate-x-1/2 w-[600px] h-[280px] bg-sky-500/15 blur-3xl pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#06142e]/60 via-[#040e24]/75 to-[#040e24] pointer-events-none" />
+        <div className="absolute -top-20 left-1/2 -translate-x-1/2 w-[650px] h-[300px] bg-sky-500/25 blur-3xl pointer-events-none" />
 
         <div className="relative z-10 max-w-5xl mx-auto text-center space-y-4">
           {/* Live Stage Badge */}
@@ -527,11 +527,6 @@ export default async function HomePage() {
                                   <span className="font-bold text-white text-xs truncate max-w-[140px] sm:max-w-none">
                                     {team.name}
                                   </span>
-                                  {isQualified && (
-                                    <span className="hidden sm:inline-block px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 text-[9px] font-black uppercase">
-                                      Q
-                                    </span>
-                                  )}
                                 </Link>
                               </td>
                               <td className="py-3 px-2 text-center font-mono">{team.played}</td>

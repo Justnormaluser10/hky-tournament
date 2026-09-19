@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 :root {
-  --background: #040814;
+  --background: #040e24;
   --foreground: #f8fafc;
   --turf-green: #059669;
   --turf-dark: #042f2e;
@@ -24,49 +24,50 @@ body {
   .turf-grid {
     background-size: 40px 40px;
     background-image: 
-      linear-gradient(to right, rgba(14, 165, 233, 0.07) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(14, 165, 233, 0.07) 1px, transparent 1px);
+      linear-gradient(to right, rgba(14, 165, 233, 0.1) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(14, 165, 233, 0.1) 1px, transparent 1px);
   }
 
   .blue-astro-turf-bg {
-    background-color: #040914;
+    background-color: #040e24;
     background-image: 
-      radial-gradient(ellipse at 50% 0%, rgba(14, 116, 144, 0.18) 0%, transparent 60%),
-      radial-gradient(circle at 85% 30%, rgba(2, 132, 199, 0.12) 0%, transparent 50%),
-      radial-gradient(circle at 15% 70%, rgba(16, 185, 129, 0.08) 0%, transparent 50%);
+      radial-gradient(ellipse at 50% 0%, rgba(14, 165, 233, 0.25) 0%, transparent 65%),
+      radial-gradient(circle at 85% 30%, rgba(2, 132, 199, 0.2) 0%, transparent 55%),
+      radial-gradient(circle at 15% 70%, rgba(16, 185, 129, 0.12) 0%, transparent 55%);
   }
 
   .turf-field-bg {
-    background: radial-gradient(circle at 50% 0%, rgba(2, 132, 199, 0.22) 0%, rgba(8, 47, 73, 0.35) 50%, #070b14 90%);
+    background: radial-gradient(circle at 50% 0%, rgba(2, 132, 199, 0.28) 0%, rgba(8, 47, 73, 0.4) 50%, #040e24 90%);
   }
 
   .stadium-lights-glow {
-    background: radial-gradient(ellipse at top center, rgba(56, 189, 248, 0.18) 0%, rgba(14, 165, 233, 0.06) 45%, transparent 75%);
+    background: radial-gradient(ellipse at top center, rgba(56, 189, 248, 0.25) 0%, rgba(14, 165, 233, 0.1) 45%, transparent 75%);
   }
 
   .pitch-lines-overlay {
     background-image:
-      radial-gradient(circle at 50% 50%, transparent 120px, rgba(255, 255, 255, 0.04) 121px, rgba(255, 255, 255, 0.04) 123px, transparent 124px),
-      linear-gradient(to bottom, transparent 49.8%, rgba(255, 255, 255, 0.05) 50%, transparent 50.2%);
+      radial-gradient(circle at 50% 50%, transparent 120px, rgba(255, 255, 255, 0.08) 121px, rgba(255, 255, 255, 0.08) 123px, transparent 124px),
+      linear-gradient(to bottom, transparent 49.8%, rgba(255, 255, 255, 0.1) 50%, transparent 50.2%);
     background-size: 100% 800px;
     background-repeat: repeat-y;
   }
 
   .glass-card {
-    background: rgba(10, 18, 36, 0.85);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(6, 18, 42, 0.78);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(56, 189, 248, 0.25);
+    box-shadow: 0 8px 32px 0 rgba(0, 10, 30, 0.45);
   }
 
   .glass-card-hover {
     transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   }
   .glass-card-hover:hover {
-    background: rgba(14, 25, 48, 0.95);
-    border-color: rgba(56, 189, 248, 0.45);
+    background: rgba(8, 24, 56, 0.88);
+    border-color: rgba(56, 189, 248, 0.55);
     transform: translateY(-2px);
-    box-shadow: 0 16px 32px -12px rgba(2, 132, 199, 0.35);
+    box-shadow: 0 16px 36px -10px rgba(2, 132, 199, 0.45);
   }
 
   .sports-gradient {

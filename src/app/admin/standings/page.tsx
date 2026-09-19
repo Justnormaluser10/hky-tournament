@@ -13,33 +13,34 @@ export default async function AdminStandingsPage() {
   return (
     <div className="space-y-8 max-w-6xl mx-auto pb-16">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/15 pb-6">
         <div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-bold uppercase tracking-wider mb-2">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/25 border border-emerald-400/50 text-emerald-200 text-xs font-black uppercase tracking-wider mb-2 shadow-sm shadow-emerald-950/40">
             <TableProperties className="w-3.5 h-3.5 text-amber-400" />
             Live Calculation Engine
           </div>
-          <h1 className="text-3xl font-black text-white uppercase tracking-tight">
+          <h1 className="text-3xl font-black text-white uppercase tracking-tight drop-shadow-sm">
             League Standings Audit
           </h1>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs sm:text-sm text-slate-200 font-medium mt-1">
             Standings computed automatically from completed match scores • Win = {tournament?.pointsForWin ?? 3}, Draw = {tournament?.pointsForDraw ?? 1}
           </p>
         </div>
 
         <Link
           href="/admin/matches"
-          className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs uppercase tracking-wider transition shadow-md flex items-center gap-2"
+          className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-500 hover:from-emerald-400 hover:via-teal-300 hover:to-emerald-400 text-white font-black text-xs uppercase tracking-wider shadow-lg shadow-emerald-500/40 hover:shadow-emerald-400/60 border-2 border-emerald-300/80 hover:border-emerald-200 flex items-center gap-2 transition-all duration-200 transform hover:-translate-y-0.5 active:translate-y-0"
         >
-          <Calendar className="w-4 h-4" /> Edit Match Scores
+          <Calendar className="w-4 h-4 text-white stroke-[2.5]" />
+          <span>Edit Match Scores</span>
         </Link>
       </div>
 
       {/* Standings Table Card */}
-      <div className="glass-card rounded-2xl overflow-hidden shadow-2xl border-white/10">
+      <div className="rounded-2xl overflow-hidden shadow-2xl bg-slate-900/85 backdrop-blur-md border border-white/20">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm text-slate-200">
-            <thead className="bg-slate-900/90 text-slate-400 font-black uppercase text-xs tracking-wider border-b border-white/10">
+            <thead className="bg-slate-950/90 text-slate-200 font-black uppercase text-xs tracking-wider border-b border-white/15">
               <tr>
                 <th className="py-4 px-4 text-center w-16">Pos</th>
                 <th className="py-4 px-4">Club / Team</th>
