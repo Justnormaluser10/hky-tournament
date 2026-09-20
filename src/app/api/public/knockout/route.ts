@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { syncKnockoutSeeds, checkLeagueStageStatus } from '@/lib/engine';
-import { toCleanLogoUrl } from '@/lib/logoUrl';
 
 export const dynamic = 'force-dynamic';
 
@@ -56,6 +55,7 @@ export async function GET() {
                 id: true,
                 name: true,
                 shortName: true,
+                logo: true,
                 primaryColor: true,
               },
             },
@@ -64,6 +64,7 @@ export async function GET() {
                 id: true,
                 name: true,
                 shortName: true,
+                logo: true,
                 primaryColor: true,
               },
             },
@@ -81,25 +82,12 @@ export async function GET() {
       orderBy: [{ stage: 'desc' }, { bracketOrder: 'asc' }],
     });
 
-    const cleanedKnockoutMatches = knockoutMatches.map((k) => ({
-      ...k,
-      match: {
-        ...k.match,
-        teamA: k.match.teamA
-          ? { ...k.match.teamA, logo: `/api/public/teams/${k.match.teamA.id}/logo` }
-          : null,
-        teamB: k.match.teamB
-          ? { ...k.match.teamB, logo: `/api/public/teams/${k.match.teamB.id}/logo` }
-          : null,
-      },
-    }));
-
     return NextResponse.json({
       tournament,
       tournamentStage: tournament.currentStage,
       format: tournament.format,
       qualificationCount: tournament.qualificationCount,
-      knockoutMatches: cleanedKnockoutMatches,
+      knockoutMatches,
       isKnockoutActive: true,
     });
   } catch (error: any) {

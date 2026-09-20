@@ -21,14 +21,13 @@ export async function GET() {
       return NextResponse.json({ error: 'Tournament not found' }, { status: 404 });
     }
 
-    const [completedMatchesCount, totalPlayersCount] = await Promise.all([
-      prisma.match.count({
-        where: { tournamentId: tournament.id, status: 'COMPLETED' },
-      }),
-      prisma.player.count({
-        where: { team: { tournamentId: tournament.id } },
-      }),
-    ]);
+    const completedMatchesCount = await prisma.match.count({
+      where: { tournamentId: tournament.id, status: 'COMPLETED' },
+    });
+
+    const totalPlayersCount = await prisma.player.count({
+      where: { team: { tournamentId: tournament.id } },
+    });
 
     return NextResponse.json({
       tournament,

@@ -13,11 +13,8 @@ import {
 } from 'lucide-react';
 import { prisma } from '@/lib/prisma';
 import { calculateStandings } from '@/lib/engine';
-import { toCleanLogoUrl } from '@/lib/logoUrl';
 import { TeamLogo } from '@/components/ui/TeamLogo';
 import { SportsAvatar } from '@/components/ui/SportsAvatar';
-
-import { getCachedPhotoPlayerIds } from '@/lib/tournamentCache';
 
 export const revalidate = 0;
 
@@ -28,97 +25,37 @@ export default async function TeamDetailPage({
 }) {
   const { id } = params;
 
-  const [rawTeam, { standings }, photoSet] = await Promise.all([
-    prisma.team.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        name: true,
-        shortName: true,
-        coach: true,
-        description: true,
-        primaryColor: true,
-        players: {
-          select: {
-            id: true,
-            name: true,
-            jerseyNumber: true,
-            position: true,
-            isCaptain: true,
-            matchEvents: {
-              where: { type: 'GOAL' },
-              select: { id: true, type: true },
-            },
+  const team = await prisma.team.findUnique({
+    where: { id },
+    include: {
+      players: {
+        include: {
+          matchEvents: {
+            where: { type: 'GOAL' },
           },
-          orderBy: [{ isCaptain: 'desc' }, { jerseyNumber: 'asc' }],
         },
-        homeMatches: {
-          select: {
-            id: true,
-            matchNumber: true,
-            stage: true,
-            round: true,
-            date: true,
-            time: true,
-            venue: true,
-            status: true,
-            teamAScore: true,
-            teamBScore: true,
-            teamAId: true,
-            teamBId: true,
-            teamB: {
-              select: { id: true, name: true, shortName: true, primaryColor: true },
-            },
-          },
-          orderBy: { date: 'asc' },
-        },
-        awayMatches: {
-          select: {
-            id: true,
-            matchNumber: true,
-            stage: true,
-            round: true,
-            date: true,
-            time: true,
-            venue: true,
-            status: true,
-            teamAScore: true,
-            teamBScore: true,
-            teamAId: true,
-            teamBId: true,
-            teamA: {
-              select: { id: true, name: true, shortName: true, primaryColor: true },
-            },
-          },
-          orderBy: { date: 'asc' },
-        },
+        orderBy: [{ isCaptain: 'desc' }, { jerseyNumber: 'asc' }],
       },
-    }),
-    calculateStandings(),
-    getCachedPhotoPlayerIds(),
-  ]);
+      homeMatches: {
+        include: {
+          teamB: { select: { id: true, name: true, shortName: true, logo: true, primaryColor: true } },
+        },
+        orderBy: { date: 'asc' },
+      },
+      awayMatches: {
+        include: {
+          teamA: { select: { id: true, name: true, shortName: true, logo: true, primaryColor: true } },
+        },
+        orderBy: { date: 'asc' },
+      },
+    },
+  });
 
-  if (!rawTeam) {
+  if (!team) {
     notFound();
   }
 
-  const team = {
-    ...rawTeam,
-    logo: `/api/public/teams/${rawTeam.id}/logo`,
-    players: rawTeam.players.map((p) => ({
-      ...p,
-      photo: photoSet.has(p.id) ? `/api/public/players/${p.id}/photo` : null,
-    })),
-    homeMatches: rawTeam.homeMatches.map((m) => ({
-      ...m,
-      teamB: m.teamB ? { ...m.teamB, logo: `/api/public/teams/${m.teamB.id}/logo` } : null,
-    })),
-    awayMatches: rawTeam.awayMatches.map((m) => ({
-      ...m,
-      teamA: m.teamA ? { ...m.teamA, logo: `/api/public/teams/${m.teamA.id}/logo` } : null,
-    })),
-  };
-
+  const { standings } = await calculateStandings();
   const teamStandings = standings.find((s) => s.teamId === team.id);
   const captain = team.players.find((p) => p.isCaptain);
 

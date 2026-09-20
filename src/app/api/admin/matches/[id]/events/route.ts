@@ -3,7 +3,6 @@ import { prisma } from '@/lib/prisma';
 import { requireAdmin } from '@/lib/adminGuard';
 import { logActivity } from '@/lib/activity';
 import { advanceKnockoutWinner, syncKnockoutSeeds, checkLeagueStageStatus } from '@/lib/engine';
-import { invalidateTournamentCache } from '@/lib/tournamentCache';
 
 async function syncMatchScoreFromEvents(matchId: string) {
   const match = await prisma.match.findUnique({
@@ -84,8 +83,6 @@ async function syncMatchScoreFromEvents(matchId: string) {
   } catch (e) {
     console.warn('League status error:', e);
   }
-
-  invalidateTournamentCache('matches');
 
   return updated;
 }

@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdmin } from '@/lib/adminGuard';
 import { logActivity } from '@/lib/activity';
-import { invalidateAnnouncementsCache } from '@/app/api/public/announcements/route';
 
 export async function GET(req: NextRequest) {
   const auth = requireAdmin(req);
@@ -50,8 +49,6 @@ export async function POST(req: NextRequest) {
       `Published announcement: "${announcement.title}" (${announcement.type})`
     );
 
-    invalidateAnnouncementsCache();
-
     return NextResponse.json({ success: true, announcement });
   } catch (error: any) {
     console.error('Error creating announcement:', error);
@@ -82,8 +79,6 @@ export async function PUT(req: NextRequest) {
 
     await logActivity(auth.admin.email, 'EDIT_ANNOUNCEMENT', `Updated announcement: "${updated.title}"`);
 
-    invalidateAnnouncementsCache();
-
     return NextResponse.json({ success: true, announcement: updated });
   } catch (error: any) {
     console.error('Error updating announcement:', error);
@@ -111,8 +106,6 @@ export async function DELETE(req: NextRequest) {
       'DELETE_ANNOUNCEMENT',
       `Deleted announcement: "${announcement.title}"`
     );
-
-    invalidateAnnouncementsCache();
 
     return NextResponse.json({ success: true, message: 'Announcement deleted.' });
   } catch (error: any) {

@@ -18,7 +18,6 @@ import {
   calculateTopGoalkeepers,
   checkLeagueStageStatus,
 } from '@/lib/engine';
-import { getCachedTournament } from '@/lib/tournamentCache';
 import { TeamLogo } from '@/components/ui/TeamLogo';
 import { SportsAvatar } from '@/components/ui/SportsAvatar';
 import { TournamentProgressionCard } from '@/components/admin/TournamentProgressionCard';
@@ -26,34 +25,22 @@ import { TournamentProgressionCard } from '@/components/admin/TournamentProgress
 export const revalidate = 0;
 
 export default async function AdminDashboardPage() {
-  const tournament = await getCachedTournament();
+  const tournament = await prisma.tournament.findFirst();
+  const { standings } = await calculateStandings(tournament?.id);
+  const leagueStatus = await checkLeagueStageStatus(tournament?.id);
+  const topScorers = await calculateTopScorers(tournament?.id);
+  const topGoalkeepers = await calculateTopGoalkeepers(tournament?.id);
 
-  const [
-    { standings },
-    leagueStatus,
-    topScorers,
-    topGoalkeepers,
-    totalTeams,
-    totalPlayers,
-    totalMatches,
-    completedMatches,
-    upcomingMatches,
-    recentActivities,
-  ] = await Promise.all([
-    calculateStandings(tournament?.id),
-    checkLeagueStageStatus(tournament?.id),
-    calculateTopScorers(tournament?.id),
-    calculateTopGoalkeepers(tournament?.id),
-    prisma.team.count(),
-    prisma.player.count(),
-    prisma.match.count(),
-    prisma.match.count({ where: { status: 'COMPLETED' } }),
-    prisma.match.count({ where: { status: 'UPCOMING' } }),
-    prisma.activityLog.findMany({
-      orderBy: { createdAt: 'desc' },
-      take: 6,
-    }),
-  ]);
+  const totalTeams = await prisma.team.count();
+  const totalPlayers = await prisma.player.count();
+  const totalMatches = await prisma.match.count();
+  const completedMatches = await prisma.match.count({ where: { status: 'COMPLETED' } });
+  const upcomingMatches = await prisma.match.count({ where: { status: 'UPCOMING' } });
+
+  const recentActivities = await prisma.activityLog.findMany({
+    orderBy: { createdAt: 'desc' },
+    take: 6,
+  });
 
   const leader = standings.length > 0 ? standings[0] : null;
   const bestScorer = topScorers.length > 0 ? topScorers[0] : null;

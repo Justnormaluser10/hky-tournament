@@ -45,9 +45,6 @@ export default function AdminLayout({
     // If already on login page, skip authentication check
     if (pathname === '/admin/login') return;
 
-    // Avoid redundant network checks if admin session is already verified in state
-    if (adminUser) return;
-
     let isMounted = true;
     async function checkAuth() {
       try {
@@ -67,7 +64,7 @@ export default function AdminLayout({
     return () => {
       isMounted = false;
     };
-  }, [pathname, router, adminUser]);
+  }, [pathname, router]);
 
   const handleLogout = async () => {
     try {

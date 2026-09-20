@@ -3,8 +3,6 @@ import { prisma } from '@/lib/prisma';
 import { requireAdmin } from '@/lib/adminGuard';
 import { logActivity } from '@/lib/activity';
 import { checkLeagueStageStatus, generateKnockoutStages, advanceKnockoutWinner } from '@/lib/engine';
-import { toCleanLogoUrl } from '@/lib/logoUrl';
-import { invalidateTournamentCache } from '@/lib/tournamentCache';
 
 export async function GET(req: NextRequest) {
   const auth = requireAdmin(req);
@@ -22,6 +20,7 @@ export async function GET(req: NextRequest) {
         id: true,
         name: true,
         shortName: true,
+        logo: true,
         primaryColor: true,
       },
       orderBy: { name: 'asc' },
@@ -32,12 +31,8 @@ export async function GET(req: NextRequest) {
       include: {
         match: {
           include: {
-            teamA: {
-              select: { id: true, name: true, shortName: true, primaryColor: true },
-            },
-            teamB: {
-              select: { id: true, name: true, shortName: true, primaryColor: true },
-            },
+            teamA: true,
+            teamB: true,
             events: {
               include: {
                 player: { select: { id: true, name: true, jerseyNumber: true } },
@@ -51,30 +46,7 @@ export async function GET(req: NextRequest) {
       orderBy: [{ stage: 'desc' }, { bracketOrder: 'asc' }],
     });
 
-    const cleanedTeams = teams.map((t) => ({
-      ...t,
-      logo: `/api/public/teams/${t.id}/logo`,
-    }));
-
-    const cleanedKnockoutMatches = knockoutMatches.map((k) => ({
-      ...k,
-      match: {
-        ...k.match,
-        teamA: k.match.teamA
-          ? { ...k.match.teamA, logo: `/api/public/teams/${k.match.teamA.id}/logo` }
-          : null,
-        teamB: k.match.teamB
-          ? { ...k.match.teamB, logo: `/api/public/teams/${k.match.teamB.id}/logo` }
-          : null,
-      },
-    }));
-
-    return NextResponse.json({
-      knockoutMatches: cleanedKnockoutMatches,
-      tournament,
-      leagueStatus,
-      teams: cleanedTeams,
-    });
+    return NextResponse.json({ knockoutMatches, tournament, leagueStatus, teams });
   } catch (error: any) {
     return NextResponse.json({ error: 'Failed to fetch knockout data' }, { status: 500 });
   }
@@ -161,8 +133,6 @@ export async function PUT(req: NextRequest) {
       `Updated teams for Match #${knockoutMatch.match.matchNumber} (${knockoutMatch.stage}): ${teamA.name} vs ${teamB.name}`
     );
 
-    invalidateTournamentCache('matches');
-
     return NextResponse.json({
       success: true,
       knockoutMatch: updatedKnockout,
@@ -216,9 +186,6 @@ export async function POST(req: NextRequest) {
     const updatedTournament = await prisma.tournament.findUnique({
       where: { id: tournament.id },
     });
-
-    invalidateTournamentCache('matches');
-    invalidateTournamentCache('tournament');
 
     return NextResponse.json({
       success: true,

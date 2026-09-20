@@ -3,8 +3,6 @@ import { prisma } from '@/lib/prisma';
 import { requireAdmin } from '@/lib/adminGuard';
 import { logActivity } from '@/lib/activity';
 import { syncKnockoutSeeds, advanceKnockoutWinner, checkLeagueStageStatus } from '@/lib/engine';
-import { toCleanLogoUrl } from '@/lib/logoUrl';
-import { invalidateTournamentCache } from '@/lib/tournamentCache';
 
 export async function GET(req: NextRequest) {
   const auth = requireAdmin(req);
@@ -13,8 +11,8 @@ export async function GET(req: NextRequest) {
   try {
     const matches = await prisma.match.findMany({
       include: {
-        teamA: { select: { id: true, name: true, shortName: true, primaryColor: true } },
-        teamB: { select: { id: true, name: true, shortName: true, primaryColor: true } },
+        teamA: { select: { id: true, name: true, shortName: true, logo: true, primaryColor: true } },
+        teamB: { select: { id: true, name: true, shortName: true, logo: true, primaryColor: true } },
         events: {
           include: {
             player: { select: { id: true, name: true, jerseyNumber: true } },
@@ -27,17 +25,7 @@ export async function GET(req: NextRequest) {
       orderBy: [{ matchNumber: 'asc' }, { date: 'asc' }],
     });
 
-    const cleanedMatches = matches.map((m) => ({
-      ...m,
-      teamA: m.teamA
-        ? { ...m.teamA, logo: `/api/public/teams/${m.teamA.id}/logo` }
-        : null,
-      teamB: m.teamB
-        ? { ...m.teamB, logo: `/api/public/teams/${m.teamB.id}/logo` }
-        : null,
-    }));
-
-    return NextResponse.json({ matches: cleanedMatches });
+    return NextResponse.json({ matches });
   } catch (error: any) {
     return NextResponse.json({ error: 'Failed to fetch matches' }, { status: 500 });
   }
@@ -97,8 +85,6 @@ export async function POST(req: NextRequest) {
       'CREATE_MATCH',
       `Scheduled Match #${match.matchNumber}: ${match.teamA?.name || 'TBD'} vs ${match.teamB?.name || 'TBD'}`
     );
-
-    invalidateTournamentCache('matches');
 
     return NextResponse.json({ success: true, match });
   } catch (error: any) {
@@ -307,8 +293,6 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    invalidateTournamentCache('matches');
-
     return NextResponse.json({ success: true, match: updated });
   } catch (error: any) {
     console.error('Error updating match:', error);
@@ -344,8 +328,6 @@ export async function DELETE(req: NextRequest) {
       'DELETE_MATCH',
       `Deleted Match #${match.matchNumber}: ${match.teamA?.name || 'TBD'} vs ${match.teamB?.name || 'TBD'}`
     );
-
-    invalidateTournamentCache('matches');
 
     return NextResponse.json({ success: true, message: 'Match deleted successfully.' });
   } catch (error: any) {
