@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdmin } from '@/lib/adminGuard';
 import { logActivity } from '@/lib/activity';
+import { invalidateTournamentCache } from '@/lib/tournamentCache';
+
+import { getCachedPhotoPlayerIds } from '@/lib/tournamentCache';
+import { invalidatePlayerPhotoBuffer } from '@/app/api/public/players/[id]/photo/route';
 
 export async function GET(req: NextRequest) {
   const auth = requireAdmin(req);
@@ -11,22 +15,39 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const teamId = searchParams.get('teamId');
 
-    const players = await prisma.player.findMany({
-      where: teamId ? { teamId } : undefined,
-      include: {
-        team: {
-          select: {
-            id: true,
-            name: true,
-            shortName: true,
-            primaryColor: true,
+    const [players, photoSet] = await Promise.all([
+      prisma.player.findMany({
+        where: teamId ? { teamId } : undefined,
+        select: {
+          id: true,
+          teamId: true,
+          name: true,
+          jerseyNumber: true,
+          position: true,
+          isCaptain: true,
+          status: true,
+          createdAt: true,
+          updatedAt: true,
+          team: {
+            select: {
+              id: true,
+              name: true,
+              shortName: true,
+              primaryColor: true,
+            },
           },
         },
-      },
-      orderBy: [{ teamId: 'asc' }, { jerseyNumber: 'asc' }],
-    });
+        orderBy: [{ teamId: 'asc' }, { jerseyNumber: 'asc' }],
+      }),
+      getCachedPhotoPlayerIds(),
+    ]);
 
-    return NextResponse.json({ players });
+    const cleanedPlayers = players.map((p) => ({
+      ...p,
+      photo: photoSet.has(p.id) ? `/api/public/players/${p.id}/photo` : null,
+    }));
+
+    return NextResponse.json({ players: cleanedPlayers });
   } catch (error: any) {
     return NextResponse.json({ error: 'Failed to fetch players' }, { status: 500 });
   }
@@ -85,6 +106,8 @@ export async function POST(req: NextRequest) {
       `Added player ${player.name} (#${player.jerseyNumber}, ${player.position}) to ${team.name}`
     );
 
+    invalidateTournamentCache('scorers');
+
     return NextResponse.json({ success: true, player });
   } catch (error: any) {
     console.error('Error creating player:', error);
@@ -127,6 +150,8 @@ export async function PUT(req: NextRequest) {
       });
     }
 
+    const isCleanPhotoUrl = typeof photo === 'string' && photo.startsWith('/api/public/players/');
+
     const updated = await prisma.player.update({
       where: { id },
       data: {
@@ -134,7 +159,7 @@ export async function PUT(req: NextRequest) {
         name: name !== undefined ? name.trim() : undefined,
         jerseyNumber: jerseyNumber !== undefined ? Number(jerseyNumber) : undefined,
         position: position !== undefined ? position.trim().toUpperCase() : undefined,
-        photo: photo !== undefined ? (photo ? photo.trim() : null) : undefined,
+        photo: isCleanPhotoUrl ? undefined : (photo !== undefined ? (photo ? photo.trim() : null) : undefined),
         isCaptain: isCaptain !== undefined ? Boolean(isCaptain) : undefined,
         status: status !== undefined ? status : undefined,
       },
@@ -145,6 +170,9 @@ export async function PUT(req: NextRequest) {
       'EDIT_PLAYER',
       `Updated player ${updated.name} (#${updated.jerseyNumber})`
     );
+
+    invalidatePlayerPhotoBuffer(id);
+    invalidateTournamentCache('scorers');
 
     return NextResponse.json({ success: true, player: updated });
   } catch (error: any) {
@@ -185,6 +213,9 @@ export async function DELETE(req: NextRequest) {
       'DELETE_PLAYER',
       `Deleted player ${player.name} (#${player.jerseyNumber})`
     );
+
+    invalidatePlayerPhotoBuffer(id);
+    invalidateTournamentCache('scorers');
 
     return NextResponse.json({ success: true, message: 'Player deleted successfully.' });
   } catch (error: any) {

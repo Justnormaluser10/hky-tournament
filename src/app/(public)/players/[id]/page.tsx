@@ -11,6 +11,7 @@ import {
   Award,
 } from 'lucide-react';
 import { prisma } from '@/lib/prisma';
+import { toCleanLogoUrl, toCleanPhotoUrl } from '@/lib/logoUrl';
 import { SportsAvatar } from '@/components/ui/SportsAvatar';
 import { TeamLogo } from '@/components/ui/TeamLogo';
 
@@ -23,16 +24,40 @@ export default async function PlayerProfilePage({
 }) {
   const { id } = params;
 
-  const player = await prisma.player.findUnique({
+  const rawPlayer = await prisma.player.findUnique({
     where: { id },
     include: {
-      team: true,
+      team: {
+        select: {
+          id: true,
+          name: true,
+          shortName: true,
+          logo: true,
+          primaryColor: true,
+        },
+      },
       matchEvents: {
         include: {
           match: {
             include: {
-              teamA: true,
-              teamB: true,
+              teamA: {
+                select: {
+                  id: true,
+                  name: true,
+                  shortName: true,
+                  logo: true,
+                  primaryColor: true,
+                },
+              },
+              teamB: {
+                select: {
+                  id: true,
+                  name: true,
+                  shortName: true,
+                  logo: true,
+                  primaryColor: true,
+                },
+              },
             },
           },
         },
@@ -41,9 +66,30 @@ export default async function PlayerProfilePage({
     },
   });
 
-  if (!player) {
+  if (!rawPlayer) {
     notFound();
   }
+
+  const player = {
+    ...rawPlayer,
+    photo: toCleanPhotoUrl(rawPlayer.id, rawPlayer.photo),
+    team: {
+      ...rawPlayer.team,
+      logo: toCleanLogoUrl(rawPlayer.team.id, rawPlayer.team.logo),
+    },
+    matchEvents: rawPlayer.matchEvents.map((ev) => ({
+      ...ev,
+      match: {
+        ...ev.match,
+        teamA: ev.match.teamA
+          ? { ...ev.match.teamA, logo: toCleanLogoUrl(ev.match.teamA.id, ev.match.teamA.logo) }
+          : null,
+        teamB: ev.match.teamB
+          ? { ...ev.match.teamB, logo: toCleanLogoUrl(ev.match.teamB.id, ev.match.teamB.logo) }
+          : null,
+      },
+    })),
+  };
 
   // Calculate stats
   const teamMatches = await prisma.match.findMany({

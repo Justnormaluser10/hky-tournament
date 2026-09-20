@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdmin } from '@/lib/adminGuard';
 import { logActivity } from '@/lib/activity';
+import { toCleanLogoUrl } from '@/lib/logoUrl';
+import { invalidateTournamentCache } from '@/lib/tournamentCache';
+import { invalidateTeamLogoBuffer } from '@/app/api/public/teams/[id]/logo/route';
 
 export async function GET(req: NextRequest) {
   const auth = requireAdmin(req);
@@ -9,8 +12,25 @@ export async function GET(req: NextRequest) {
 
   try {
     const teams = await prisma.team.findMany({
-      include: {
+      select: {
+        id: true,
+        tournamentId: true,
+        name: true,
+        shortName: true,
+        coach: true,
+        description: true,
+        primaryColor: true,
+        captainId: true,
+        createdAt: true,
+        updatedAt: true,
         players: {
+          select: {
+            id: true,
+            name: true,
+            jerseyNumber: true,
+            position: true,
+            isCaptain: true,
+          },
           orderBy: [{ isCaptain: 'desc' }, { jerseyNumber: 'asc' }],
         },
         _count: {
@@ -24,7 +44,12 @@ export async function GET(req: NextRequest) {
       orderBy: { name: 'asc' },
     });
 
-    return NextResponse.json({ teams });
+    const cleanedTeams = teams.map((team) => ({
+      ...team,
+      logo: `/api/public/teams/${team.id}/logo`,
+    }));
+
+    return NextResponse.json({ teams: cleanedTeams });
   } catch (error: any) {
     return NextResponse.json({ error: 'Failed to fetch teams' }, { status: 500 });
   }
@@ -39,12 +64,12 @@ export async function POST(req: NextRequest) {
     const { name, shortName, coach, description, primaryColor, logo } = body;
 
     if (!name || !shortName) {
-      return NextResponse.json({ error: 'Team name and short name are required.' }, { status: 400 });
+      return NextResponse.json({ error: 'Name and short name are required.' }, { status: 400 });
     }
 
     const tournament = await prisma.tournament.findFirst();
     if (!tournament) {
-      return NextResponse.json({ error: 'Tournament not found' }, { status: 404 });
+      return NextResponse.json({ error: 'No active tournament found' }, { status: 404 });
     }
 
     const team = await prisma.team.create({
@@ -55,13 +80,15 @@ export async function POST(req: NextRequest) {
         coach: coach?.trim() || null,
         description: description?.trim() || null,
         primaryColor: primaryColor || '#059669',
-        logo: logo || null,
+        logo: logo && logo.trim() ? logo.trim() : null,
       },
     });
 
-    await logActivity(auth.admin.email, 'ADD_TEAM', `Added new team: "${team.name}" (${team.shortName})`);
+    await logActivity(auth.admin.email, 'CREATE_TEAM', `Created team "${team.name}"`);
 
-    return NextResponse.json({ success: true, team });
+    invalidateTournamentCache('teams');
+
+    return NextResponse.json({ success: true, team }, { status: 201 });
   } catch (error: any) {
     console.error('Error creating team:', error);
     return NextResponse.json({ error: 'Failed to create team' }, { status: 500 });
@@ -80,6 +107,8 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Team ID is required.' }, { status: 400 });
     }
 
+    const isCleanLogoUrl = typeof logo === 'string' && logo.startsWith('/api/public/teams/');
+
     const updated = await prisma.team.update({
       where: { id },
       data: {
@@ -88,11 +117,14 @@ export async function PUT(req: NextRequest) {
         coach: coach !== undefined ? coach?.trim() : undefined,
         description: description !== undefined ? description?.trim() : undefined,
         primaryColor: primaryColor || undefined,
-        logo: logo !== undefined ? (logo && logo.trim() ? logo.trim() : null) : undefined,
+        logo: isCleanLogoUrl ? undefined : (logo !== undefined ? (logo && logo.trim() ? logo.trim() : null) : undefined),
       },
     });
 
     await logActivity(auth.admin.email, 'EDIT_TEAM', `Updated details for team "${updated.name}"`);
+
+    invalidateTeamLogoBuffer(id);
+    invalidateTournamentCache('teams');
 
     return NextResponse.json({ success: true, team: updated });
   } catch (error: any) {
@@ -121,6 +153,9 @@ export async function DELETE(req: NextRequest) {
     await prisma.team.delete({ where: { id } });
 
     await logActivity(auth.admin.email, 'DELETE_TEAM', `Deleted team "${team.name}"`);
+
+    invalidateTeamLogoBuffer(id);
+    invalidateTournamentCache('teams');
 
     return NextResponse.json({ success: true, message: 'Team deleted successfully.' });
   } catch (error: any) {

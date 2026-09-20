@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdmin } from '@/lib/adminGuard';
 import { logActivity } from '@/lib/activity';
+import { invalidateTournamentCache } from '@/lib/tournamentCache';
 
 export async function GET(req: NextRequest) {
   const auth = requireAdmin(req);
@@ -55,6 +56,8 @@ export async function PUT(req: NextRequest) {
       'UPDATE_TOURNAMENT',
       `Updated tournament settings (Stage: ${updated.currentStage}, Status: ${updated.status})`
     );
+
+    invalidateTournamentCache('tournament');
 
     return NextResponse.json({ success: true, tournament: updated });
   } catch (error: any) {

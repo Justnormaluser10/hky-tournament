@@ -3,27 +3,39 @@ import Link from 'next/link';
 import { Users, Trophy, ChevronRight, Shield } from 'lucide-react';
 import { prisma } from '@/lib/prisma';
 import { calculateStandings } from '@/lib/engine';
+import { toCleanLogoUrl } from '@/lib/logoUrl';
 import { TeamLogo } from '@/components/ui/TeamLogo';
 
 export const revalidate = 0;
 
 export default async function TeamsPage() {
-  const teams = await prisma.team.findMany({
-    include: {
-      players: {
-        select: {
-          id: true,
-          name: true,
-          isCaptain: true,
-          position: true,
-          photo: true,
+  const [rawTeams, { standings }] = await Promise.all([
+    prisma.team.findMany({
+      select: {
+        id: true,
+        name: true,
+        shortName: true,
+        coach: true,
+        primaryColor: true,
+        players: {
+          select: {
+            id: true,
+            name: true,
+            isCaptain: true,
+            position: true,
+          },
         },
       },
-    },
-    orderBy: { name: 'asc' },
-  });
+      orderBy: { name: 'asc' },
+    }),
+    calculateStandings(),
+  ]);
 
-  const { standings } = await calculateStandings();
+  const teams = rawTeams.map((team) => ({
+    ...team,
+    logo: `/api/public/teams/${team.id}/logo`,
+  }));
+
   const standingsMap = new Map(standings.map((s) => [s.teamId, s]));
 
   return (

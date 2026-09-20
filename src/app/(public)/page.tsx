@@ -19,6 +19,8 @@ import {
   calculateTopGoalkeepers,
   checkLeagueStageStatus,
 } from '@/lib/engine';
+import { getCachedTournament } from '@/lib/tournamentCache';
+import { toCleanLogoUrl } from '@/lib/logoUrl';
 import { TeamLogo } from '@/components/ui/TeamLogo';
 import { SportsAvatar } from '@/components/ui/SportsAvatar';
 import { KnockoutBracket } from '@/components/public/KnockoutBracket';
@@ -28,14 +30,95 @@ import { StageTransitionBanner } from '@/components/public/StageTransitionBanner
 export const revalidate = 0; // Dynamic server-side rendering for fresh tournament scores
 
 export default async function HomePage() {
-  const tournament = await prisma.tournament.findFirst();
+  const tournament = await getCachedTournament();
   let currentStage = tournament?.currentStage || 'LEAGUE';
   const qualificationCount = tournament?.qualificationCount || 4;
 
-  const leagueStatus = await checkLeagueStageStatus(tournament?.id);
-  const { standings } = await calculateStandings(tournament?.id);
-  const topScorers = await calculateTopScorers(tournament?.id);
-  const topGoalkeepers = await calculateTopGoalkeepers(tournament?.id);
+  const [
+    leagueStatus,
+    { standings },
+    topScorers,
+    topGoalkeepers,
+    upcomingMatchRaw,
+    latestCompletedMatchRaw,
+    teamsRaw,
+    announcements,
+  ] = await Promise.all([
+    checkLeagueStageStatus(tournament?.id),
+    calculateStandings(tournament?.id),
+    calculateTopScorers(tournament?.id),
+    calculateTopGoalkeepers(tournament?.id),
+    prisma.match.findFirst({
+      where: {
+        tournamentId: tournament?.id,
+        status: 'UPCOMING',
+      },
+      include: {
+        teamA: { select: { id: true, name: true, shortName: true, primaryColor: true } },
+        teamB: { select: { id: true, name: true, shortName: true, primaryColor: true } },
+      },
+      orderBy: [{ date: 'asc' }, { matchNumber: 'asc' }],
+    }),
+    prisma.match.findFirst({
+      where: {
+        tournamentId: tournament?.id,
+        status: 'COMPLETED',
+      },
+      include: {
+        teamA: { select: { id: true, name: true, shortName: true, primaryColor: true } },
+        teamB: { select: { id: true, name: true, shortName: true, primaryColor: true } },
+        events: {
+          where: { type: 'GOAL' },
+          include: {
+            player: { select: { id: true, name: true, jerseyNumber: true } },
+            team: { select: { id: true, name: true, shortName: true } },
+          },
+          orderBy: { minute: 'asc' },
+        },
+      },
+      orderBy: { updatedAt: 'desc' },
+    }),
+    prisma.team.findMany({
+      where: { tournamentId: tournament?.id },
+      select: { id: true, name: true, shortName: true, primaryColor: true },
+      take: 6,
+    }),
+    prisma.announcement.findMany({
+      where: { tournamentId: tournament?.id },
+      orderBy: [{ isPinned: 'desc' }, { createdAt: 'desc' }],
+      take: 2,
+    }),
+  ]);
+
+  // Clean logo payloads for fast hydration and rendering
+  const upcomingMatch = upcomingMatchRaw
+    ? {
+        ...upcomingMatchRaw,
+        teamA: upcomingMatchRaw.teamA
+          ? { ...upcomingMatchRaw.teamA, logo: `/api/public/teams/${upcomingMatchRaw.teamA.id}/logo` }
+          : null,
+        teamB: upcomingMatchRaw.teamB
+          ? { ...upcomingMatchRaw.teamB, logo: `/api/public/teams/${upcomingMatchRaw.teamB.id}/logo` }
+          : null,
+      }
+    : null;
+
+  const latestCompletedMatch = latestCompletedMatchRaw
+    ? {
+        ...latestCompletedMatchRaw,
+        teamA: latestCompletedMatchRaw.teamA
+          ? { ...latestCompletedMatchRaw.teamA, logo: `/api/public/teams/${latestCompletedMatchRaw.teamA.id}/logo` }
+          : null,
+        teamB: latestCompletedMatchRaw.teamB
+          ? { ...latestCompletedMatchRaw.teamB, logo: `/api/public/teams/${latestCompletedMatchRaw.teamB.id}/logo` }
+          : null,
+      }
+    : null;
+
+  const teams = teamsRaw.map((t) => ({
+    ...t,
+    logo: `/api/public/teams/${t.id}/logo`,
+  }));
 
   // Self-heal: If league is not complete, stage must remain LEAGUE
   if (!leagueStatus.isComplete && currentStage !== 'LEAGUE' && tournament?.id) {
@@ -45,37 +128,6 @@ export default async function HomePage() {
       data: { currentStage: 'LEAGUE' },
     });
   }
-
-  // Next Upcoming Match
-  const upcomingMatch = await prisma.match.findFirst({
-    where: {
-      tournamentId: tournament?.id,
-      status: 'UPCOMING',
-    },
-    include: {
-      teamA: true,
-      teamB: true,
-    },
-    orderBy: [{ date: 'asc' }, { matchNumber: 'asc' }],
-  });
-
-  // Latest Completed Match
-  const latestCompletedMatch = await prisma.match.findFirst({
-    where: {
-      tournamentId: tournament?.id,
-      status: 'COMPLETED',
-    },
-    include: {
-      teamA: true,
-      teamB: true,
-      events: {
-        where: { type: 'GOAL' },
-        include: { player: true, team: true },
-        orderBy: { minute: 'asc' },
-      },
-    },
-    orderBy: { updatedAt: 'desc' },
-  });
 
   // Knockout stage can ONLY be active if:
   // 1. League stage is 100% complete
@@ -129,7 +181,7 @@ export default async function HomePage() {
   const isCompleted = hasKnockoutStarted && currentStage === 'COMPLETED';
   const isLeagueComplete = leagueStatus.isComplete && !hasKnockoutStarted;
 
-  // Format knockout matches
+  // Format knockout matches with clean logos
   const knockoutMatches = knockoutMatchesRaw.map((k) => ({
     id: k.id,
     stage: k.stage,
@@ -145,8 +197,12 @@ export default async function HomePage() {
       venue: k.match.venue,
       status: k.match.status,
       winnerId: k.match.winnerId,
-      teamA: k.match.teamA,
-      teamB: k.match.teamB,
+      teamA: k.match.teamA
+        ? { ...k.match.teamA, logo: toCleanLogoUrl(k.match.teamA.id, k.match.teamA.logo) }
+        : null,
+      teamB: k.match.teamB
+        ? { ...k.match.teamB, logo: toCleanLogoUrl(k.match.teamB.id, k.match.teamB.logo) }
+        : null,
       events: k.match.events,
     },
   }));
@@ -171,19 +227,6 @@ export default async function HomePage() {
       teamBScore: finalKnockout.match.teamBScore,
     };
   }
-
-  // Active Teams for team showcase
-  const teams = await prisma.team.findMany({
-    where: { tournamentId: tournament?.id },
-    take: 6,
-  });
-
-  // Recent Announcements
-  const announcements = await prisma.announcement.findMany({
-    where: { tournamentId: tournament?.id },
-    orderBy: [{ isPinned: 'desc' }, { createdAt: 'desc' }],
-    take: 2,
-  });
 
   const getStageDisplay = () => {
     if (isCompleted) return 'CHAMPIONSHIP COMPLETE';
