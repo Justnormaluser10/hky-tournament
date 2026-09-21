@@ -14,11 +14,9 @@ const DEFAULT_TURSO_AUTH_TOKEN =
 
 function createPrismaClient() {
   const tursoUrl =
-    process.env.TURSO_DATABASE_URL ||
-    (process.env.NODE_ENV === 'production' ? DEFAULT_TURSO_URL : undefined);
+    process.env.TURSO_DATABASE_URL || DEFAULT_TURSO_URL;
   const tursoAuthToken =
-    process.env.TURSO_AUTH_TOKEN ||
-    (process.env.NODE_ENV === 'production' ? DEFAULT_TURSO_AUTH_TOKEN : undefined);
+    process.env.TURSO_AUTH_TOKEN || DEFAULT_TURSO_AUTH_TOKEN;
 
   if (tursoUrl) {
     const libsql = createClient({

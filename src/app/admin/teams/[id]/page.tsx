@@ -61,6 +61,7 @@ export default function AdminTeamSquadPage({
   const [position, setPosition] = useState('FORWARD');
   const [photo, setPhoto] = useState('');
   const [isCaptain, setIsCaptain] = useState(false);
+  const [status, setStatus] = useState('ACTIVE');
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
 
