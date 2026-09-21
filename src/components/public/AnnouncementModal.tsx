@@ -26,10 +26,18 @@ export function AnnouncementModal() {
         const res = await fetch('/api/public/announcements');
         if (!res.ok) return;
         const data = await res.json();
-        const latest: Announcement | null = data.latestAnnouncement;
+        const latest: Announcement | null = data?.latestAnnouncement;
 
-        if (latest) {
-          const lastSeenId = localStorage.getItem(STORAGE_KEY);
+        if (latest && latest.id) {
+          let lastSeenId: string | null = null;
+          try {
+            if (typeof window !== 'undefined' && window.localStorage) {
+              lastSeenId = window.localStorage.getItem(STORAGE_KEY);
+            }
+          } catch {
+            // Storage access restricted (private browsing / iframe)
+          }
+
           // Only show if the user hasn't seen THIS specific announcement ID before
           if (lastSeenId !== latest.id) {
             setAnnouncement(latest);
@@ -45,12 +53,32 @@ export function AnnouncementModal() {
   }, []);
 
   const handleDismiss = () => {
-    if (announcement) {
-      // Mark as seen permanently for this browser
-      localStorage.setItem(STORAGE_KEY, announcement.id);
+    try {
+      if (announcement?.id && typeof window !== 'undefined' && window.localStorage) {
+        // Mark as seen permanently for this browser
+        window.localStorage.setItem(STORAGE_KEY, announcement.id);
+      }
+    } catch {
+      // Storage access restricted
     }
     setIsOpen(false);
   };
+
+  const formattedDate = React.useMemo(() => {
+    if (!announcement?.createdAt) return '';
+    try {
+      const d = new Date(announcement.createdAt);
+      if (isNaN(d.getTime())) return '';
+      return d.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch {
+      return '';
+    }
+  }, [announcement?.createdAt]);
 
   if (!isOpen || !announcement) return null;
 
@@ -86,14 +114,11 @@ export function AnnouncementModal() {
               <span className="text-xs uppercase font-bold tracking-widest text-emerald-400">
                 Official Tournament Announcement
               </span>
-              <span className="block text-xs text-slate-400">
-                {new Date(announcement.createdAt).toLocaleDateString(undefined, {
-                  month: 'short',
-                  day: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
-              </span>
+              {formattedDate && (
+                <span className="block text-xs text-slate-400">
+                  {formattedDate}
+                </span>
+              )}
             </div>
           </div>
 

@@ -30,16 +30,17 @@ export function AnnouncementTicker() {
   }, []);
 
   useEffect(() => {
-    if (announcements.length <= 1) return;
+    if (!announcements || announcements.length <= 1) return;
     const interval = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % announcements.length);
     }, 5000);
     return () => clearInterval(interval);
-  }, [announcements.length]);
+  }, [announcements?.length]);
 
-  if (announcements.length === 0) return null;
+  if (!announcements || announcements.length === 0) return null;
 
-  const current = announcements[currentIndex];
+  const current = announcements[currentIndex] || announcements[0];
+  if (!current || !current.title) return null;
 
   return (
     <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-emerald-950 border-b border-emerald-500/20 text-xs py-2 px-4">

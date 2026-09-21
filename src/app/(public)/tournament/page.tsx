@@ -53,8 +53,21 @@ export default async function TournamentPage() {
           </div>
           <span className="text-xs uppercase font-bold text-slate-400 tracking-wider">Dates</span>
           <h3 className="text-lg font-black text-white mt-1">
-            {tournament?.startDate ? new Date(tournament.startDate).toLocaleDateString() : 'Sept 2026'} –{' '}
-            {tournament?.endDate ? new Date(tournament.endDate).toLocaleDateString() : 'Sept 2026'}
+            {tournament?.startDate
+              ? new Date(tournament.startDate).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                })
+              : 'Sept 2026'}{' '}
+            –{' '}
+            {tournament?.endDate
+              ? new Date(tournament.endDate).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                })
+              : 'Sept 2026'}
           </h3>
           <p className="text-xs text-emerald-400 font-semibold mt-2">
             Status: {tournament?.status}

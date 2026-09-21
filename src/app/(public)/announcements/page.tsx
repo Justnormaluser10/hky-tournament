@@ -72,7 +72,7 @@ export default async function AnnouncementsPage() {
                   </div>
 
                   <span className="text-[11px] text-slate-400 font-medium">
-                    {new Date(ann.createdAt).toLocaleDateString(undefined, {
+                    {new Date(ann.createdAt).toLocaleDateString('en-US', {
                       month: 'short',
                       day: 'numeric',
                       hour: '2-digit',

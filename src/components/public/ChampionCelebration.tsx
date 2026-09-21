@@ -2,7 +2,6 @@
 
 import React, { useEffect } from 'react';
 import Link from 'next/link';
-import confetti from 'canvas-confetti';
 import { Trophy, Award, Flame, Shield, Sparkles, ChevronRight } from 'lucide-react';
 import { TeamLogo } from '@/components/ui/TeamLogo';
 import { SportsAvatar } from '@/components/ui/SportsAvatar';
@@ -39,35 +38,52 @@ export function ChampionCelebration({
   topGoalkeeper,
 }: ChampionCelebrationProps) {
   useEffect(() => {
-    // Fire celebratory confetti cascade
+    // Fire celebratory confetti cascade safely in browser
+    let isMounted = true;
     try {
-      const duration = 3.5 * 1000;
-      const end = Date.now() + duration;
+      if (typeof window === 'undefined') return;
+      import('canvas-confetti')
+        .then((module) => {
+          if (!isMounted) return;
+          const confetti = module.default || module;
+          if (typeof confetti !== 'function') return;
 
-      const frame = () => {
-        confetti({
-          particleCount: 4,
-          angle: 60,
-          spread: 55,
-          origin: { x: 0 },
-          colors: ['#059669', '#10b981', '#f59e0b', '#fbbf24'],
-        });
-        confetti({
-          particleCount: 4,
-          angle: 120,
-          spread: 55,
-          origin: { x: 1 },
-          colors: ['#059669', '#10b981', '#f59e0b', '#fbbf24'],
-        });
+          const duration = 3.5 * 1000;
+          const end = Date.now() + duration;
 
-        if (Date.now() < end) {
-          requestAnimationFrame(frame);
-        }
-      };
-      frame();
+          const frame = () => {
+            if (!isMounted) return;
+            confetti({
+              particleCount: 4,
+              angle: 60,
+              spread: 55,
+              origin: { x: 0 },
+              colors: ['#059669', '#10b981', '#f59e0b', '#fbbf24'],
+            });
+            confetti({
+              particleCount: 4,
+              angle: 120,
+              spread: 55,
+              origin: { x: 1 },
+              colors: ['#059669', '#10b981', '#f59e0b', '#fbbf24'],
+            });
+
+            if (Date.now() < end) {
+              requestAnimationFrame(frame);
+            }
+          };
+          frame();
+        })
+        .catch((err) => {
+          console.warn('Could not load confetti:', err);
+        });
     } catch (e) {
       console.warn(e);
     }
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   return (
@@ -129,7 +145,7 @@ export function ChampionCelebration({
 
         {/* Individual Honors Spotlight */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 text-left">
-          {topScorer && (
+          {topScorer?.playerName && (
             <div className="glass-card rounded-2xl p-4 border-emerald-500/30 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <SportsAvatar
@@ -153,7 +169,7 @@ export function ChampionCelebration({
             </div>
           )}
 
-          {topGoalkeeper && (
+          {topGoalkeeper?.playerName && (
             <div className="glass-card rounded-2xl p-4 border-teal-500/30 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <SportsAvatar

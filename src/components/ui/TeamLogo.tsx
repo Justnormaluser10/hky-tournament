@@ -230,13 +230,15 @@ export function TeamLogo({
 
   const abbreviation =
     shortName ||
-    (name
+    (name && typeof name === 'string'
       ? name
-          .split(' ')
+          .trim()
+          .split(/\s+/)
+          .filter(Boolean)
           .map((w) => w[0])
           .slice(0, 3)
           .join('')
-          .toUpperCase()
+          .toUpperCase() || 'HKY'
       : 'HKY');
 
   const isUrl = Boolean(

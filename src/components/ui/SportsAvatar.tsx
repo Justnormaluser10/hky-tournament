@@ -26,13 +26,18 @@ export function SportsAvatar({
     xl: 'w-28 h-28 text-2xl',
   };
 
-  const getInitials = (str: string) => {
-    return str
-      .split(' ')
-      .map((n) => n[0])
-      .slice(0, 2)
-      .join('')
-      .toUpperCase();
+  const getInitials = (str?: string | null) => {
+    if (!str || typeof str !== 'string') return 'HKY';
+    return (
+      str
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean)
+        .map((n) => n[0])
+        .slice(0, 2)
+        .join('')
+        .toUpperCase() || 'HKY'
+    );
   };
 
   if (photo) {
