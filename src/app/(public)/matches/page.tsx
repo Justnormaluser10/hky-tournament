@@ -55,7 +55,7 @@ interface Match {
 }
 
 export default function MatchesPage() {
-  const [matches, setMatches] = useState<Match[]>([]);
+  const [allMatches, setAllMatches] = useState<Match[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [roundFilter, setRoundFilter] = useState('ALL');
@@ -65,14 +65,10 @@ export default function MatchesPage() {
     async function fetchMatches() {
       setLoading(true);
       try {
-        const query = new URLSearchParams();
-        if (statusFilter !== 'ALL') query.set('status', statusFilter);
-        if (roundFilter !== 'ALL') query.set('round', roundFilter);
-
-        const res = await fetch(`/api/public/matches?${query.toString()}`);
+        const res = await fetch('/api/public/matches');
         if (res.ok) {
           const data = await res.json();
-          setMatches(data.matches || []);
+          setAllMatches(data.matches || []);
         }
       } catch (err) {
         console.error(err);
@@ -81,7 +77,15 @@ export default function MatchesPage() {
       }
     }
     fetchMatches();
-  }, [statusFilter, roundFilter]);
+  }, []);
+
+  const matches = React.useMemo(() => {
+    return allMatches.filter((m) => {
+      if (statusFilter !== 'ALL' && m.status !== statusFilter) return false;
+      if (roundFilter !== 'ALL' && m.round !== roundFilter) return false;
+      return true;
+    });
+  }, [allMatches, statusFilter, roundFilter]);
 
   const statusTabs = [
     { label: 'All Matches', value: 'ALL' },

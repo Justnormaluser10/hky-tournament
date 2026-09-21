@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Megaphone, ChevronRight } from 'lucide-react';
+import { fetchPublicAnnouncements } from '@/lib/announcementsClient';
 
 interface Announcement {
   id: string;
@@ -18,10 +19,10 @@ export function AnnouncementTicker() {
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch('/api/public/announcements');
-        if (!res.ok) return;
-        const data = await res.json();
-        setAnnouncements(data.announcements || []);
+        const data = await fetchPublicAnnouncements();
+        if (data?.announcements) {
+          setAnnouncements(data.announcements);
+        }
       } catch (e) {
         console.error(e);
       }

@@ -15,10 +15,17 @@ export async function GET() {
 
     const latestAnnouncement = announcements.length > 0 ? announcements[0] : null;
 
-    return NextResponse.json({
-      announcements,
-      latestAnnouncement,
-    });
+    return NextResponse.json(
+      {
+        announcements,
+        latestAnnouncement,
+      },
+      {
+        headers: {
+          'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=120',
+        },
+      }
+    );
   } catch (error: any) {
     console.error('Error fetching announcements:', error);
     return NextResponse.json({ error: 'Failed to fetch announcements' }, { status: 500 });

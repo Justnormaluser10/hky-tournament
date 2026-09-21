@@ -14,7 +14,7 @@ import { prisma } from '@/lib/prisma';
 import { SportsAvatar } from '@/components/ui/SportsAvatar';
 import { TeamLogo } from '@/components/ui/TeamLogo';
 
-export const revalidate = 0;
+export const revalidate = 30;
 
 export default async function PlayerProfilePage({
   params,

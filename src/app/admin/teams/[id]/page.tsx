@@ -61,6 +61,7 @@ export default function AdminTeamSquadPage({
   const [position, setPosition] = useState('FORWARD');
   const [photo, setPhoto] = useState('');
   const [isCaptain, setIsCaptain] = useState(false);
+  const [status, setStatus] = useState('ACTIVE');
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
 
@@ -71,7 +72,7 @@ export default function AdminTeamSquadPage({
 
   const fetchTeam = async () => {
     try {
-      const res = await fetch(`/api/public/teams/${teamId}`);
+      const res = await fetch(`/api/public/teams/${teamId}`, { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
         setTeam(data.team);

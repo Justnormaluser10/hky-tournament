@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { requireAdmin } from '@/lib/adminGuard';
 import { logActivity } from '@/lib/activity';
 import { checkLeagueStageStatus, generateKnockoutStages, advanceKnockoutWinner } from '@/lib/engine';
+import { revalidateTournamentData } from '@/lib/revalidate';
 
 export async function GET(req: NextRequest) {
   const auth = requireAdmin(req);
@@ -133,6 +134,8 @@ export async function PUT(req: NextRequest) {
       `Updated teams for Match #${knockoutMatch.match.matchNumber} (${knockoutMatch.stage}): ${teamA.name} vs ${teamB.name}`
     );
 
+    revalidateTournamentData();
+
     return NextResponse.json({
       success: true,
       knockoutMatch: updatedKnockout,
@@ -186,6 +189,8 @@ export async function POST(req: NextRequest) {
     const updatedTournament = await prisma.tournament.findUnique({
       where: { id: tournament.id },
     });
+
+    revalidateTournamentData();
 
     return NextResponse.json({
       success: true,

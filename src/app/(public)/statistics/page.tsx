@@ -17,7 +17,7 @@ import {
 import { TeamLogo } from '@/components/ui/TeamLogo';
 import { SportsAvatar } from '@/components/ui/SportsAvatar';
 
-export const revalidate = 0;
+export const revalidate = 30;
 
 export default async function StatisticsPage() {
   const [topScorers, topGoalkeepers, teamStats] = await Promise.all([

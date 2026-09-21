@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdmin } from '@/lib/adminGuard';
 import { logActivity } from '@/lib/activity';
+import { revalidateTournamentData } from '@/lib/revalidate';
 
 export async function POST(req: NextRequest) {
   const auth = requireAdmin(req);
@@ -127,6 +128,8 @@ export async function POST(req: NextRequest) {
       'GENERATE_FIXTURES',
       `Auto-generated ${insertedCount} round-robin league fixtures for ${teams.length} teams.`
     );
+
+    revalidateTournamentData();
 
     return NextResponse.json({
       success: true,

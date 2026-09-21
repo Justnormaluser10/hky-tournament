@@ -2,7 +2,7 @@ import React from 'react';
 import { Megaphone, Pin, Calendar, AlertCircle } from 'lucide-react';
 import { prisma } from '@/lib/prisma';
 
-export const revalidate = 0;
+export const revalidate = 30;
 
 export default async function AnnouncementsPage() {
   const announcements = await prisma.announcement.findMany({

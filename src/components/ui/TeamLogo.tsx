@@ -257,6 +257,8 @@ export function TeamLogo({
           alt={name || 'Team Logo'}
           onError={() => setImageError(true)}
           className="w-full h-full object-contain"
+          loading="lazy"
+          decoding="async"
         />
       </div>
     );
