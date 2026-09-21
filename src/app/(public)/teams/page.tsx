@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { calculateStandings } from '@/lib/engine';
 import { TeamLogo } from '@/components/ui/TeamLogo';
 
-export const revalidate = 30;
+export const revalidate = 0;
 
 export default async function TeamsPage() {
   const teams = await prisma.team.findMany({

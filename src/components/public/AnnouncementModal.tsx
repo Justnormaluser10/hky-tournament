@@ -4,7 +4,6 @@ import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Sparkles, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
-import { fetchPublicAnnouncements } from '@/lib/announcementsClient';
 
 interface Announcement {
   id: string;
@@ -24,8 +23,10 @@ export function AnnouncementModal() {
   useEffect(() => {
     async function checkLatestAnnouncement() {
       try {
-        const data = await fetchPublicAnnouncements();
-        const latest: Announcement | null = data?.latestAnnouncement || null;
+        const res = await fetch('/api/public/announcements');
+        if (!res.ok) return;
+        const data = await res.json();
+        const latest: Announcement | null = data.latestAnnouncement;
 
         if (latest) {
           const lastSeenId = localStorage.getItem(STORAGE_KEY);

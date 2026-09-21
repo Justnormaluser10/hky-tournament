@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdmin } from '@/lib/adminGuard';
 import { logActivity } from '@/lib/activity';
-import { revalidateTournamentData } from '@/lib/revalidate';
 
 export async function POST(
   req: NextRequest,
@@ -59,8 +58,6 @@ export async function POST(
         } to ${newCaptain.name}`
       );
 
-      revalidateTournamentData();
-
       return NextResponse.json({
         success: true,
         message: `Captain updated to ${newCaptain.name}`,
@@ -83,8 +80,6 @@ export async function POST(
         'REMOVE_CAPTAIN',
         `Removed captain designation from "${team.name}"`
       );
-
-      revalidateTournamentData();
 
       return NextResponse.json({
         success: true,

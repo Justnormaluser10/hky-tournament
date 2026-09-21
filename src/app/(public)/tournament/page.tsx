@@ -2,7 +2,7 @@ import React from 'react';
 import { prisma } from '@/lib/prisma';
 import { Trophy, Calendar, MapPin, CheckCircle2, Shield, Info, HelpCircle } from 'lucide-react';
 
-export const revalidate = 300; // Format and rules rarely change, 5m revalidation
+export const revalidate = 0;
 
 export default async function TournamentPage() {
   const tournament = await prisma.tournament.findFirst();

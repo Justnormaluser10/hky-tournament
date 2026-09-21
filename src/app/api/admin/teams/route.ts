@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdmin } from '@/lib/adminGuard';
 import { logActivity } from '@/lib/activity';
-import { revalidateTournamentData } from '@/lib/revalidate';
 
 export async function GET(req: NextRequest) {
   const auth = requireAdmin(req);
@@ -62,8 +61,6 @@ export async function POST(req: NextRequest) {
 
     await logActivity(auth.admin.email, 'ADD_TEAM', `Added new team: "${team.name}" (${team.shortName})`);
 
-    revalidateTournamentData();
-
     return NextResponse.json({ success: true, team });
   } catch (error: any) {
     console.error('Error creating team:', error);
@@ -97,8 +94,6 @@ export async function PUT(req: NextRequest) {
 
     await logActivity(auth.admin.email, 'EDIT_TEAM', `Updated details for team "${updated.name}"`);
 
-    revalidateTournamentData();
-
     return NextResponse.json({ success: true, team: updated });
   } catch (error: any) {
     console.error('Error updating team:', error);
@@ -126,8 +121,6 @@ export async function DELETE(req: NextRequest) {
     await prisma.team.delete({ where: { id } });
 
     await logActivity(auth.admin.email, 'DELETE_TEAM', `Deleted team "${team.name}"`);
-
-    revalidateTournamentData();
 
     return NextResponse.json({ success: true, message: 'Team deleted successfully.' });
   } catch (error: any) {

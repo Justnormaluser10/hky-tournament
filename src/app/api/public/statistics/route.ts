@@ -15,18 +15,11 @@ export async function GET() {
       calculateTeamStats(),
     ]);
 
-    return NextResponse.json(
-      {
-        topScorers,
-        topGoalkeepers,
-        teamStats,
-      },
-      {
-        headers: {
-          'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=120',
-        },
-      }
-    );
+    return NextResponse.json({
+      topScorers,
+      topGoalkeepers,
+      teamStats,
+    });
   } catch (error: any) {
     console.error('Error calculating statistics:', error);
     return NextResponse.json({ error: 'Failed to calculate statistics' }, { status: 500 });

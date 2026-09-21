@@ -44,8 +44,6 @@ export function SportsAvatar({
           src={photo}
           alt={name}
           className="w-full h-full object-cover object-top"
-          loading="lazy"
-          decoding="async"
           onError={(e) => {
             // Fallback to stylized silhouette if image URL fails
             (e.target as HTMLElement).style.display = 'none';

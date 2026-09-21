@@ -3,7 +3,6 @@ import { prisma } from '@/lib/prisma';
 import { requireAdmin } from '@/lib/adminGuard';
 import { logActivity } from '@/lib/activity';
 import { syncKnockoutSeeds, advanceKnockoutWinner, checkLeagueStageStatus } from '@/lib/engine';
-import { revalidateTournamentData } from '@/lib/revalidate';
 
 export async function GET(req: NextRequest) {
   const auth = requireAdmin(req);
@@ -86,8 +85,6 @@ export async function POST(req: NextRequest) {
       'CREATE_MATCH',
       `Scheduled Match #${match.matchNumber}: ${match.teamA?.name || 'TBD'} vs ${match.teamB?.name || 'TBD'}`
     );
-
-    revalidateTournamentData();
 
     return NextResponse.json({ success: true, match });
   } catch (error: any) {
@@ -296,8 +293,6 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    revalidateTournamentData();
-
     return NextResponse.json({ success: true, match: updated });
   } catch (error: any) {
     console.error('Error updating match:', error);
@@ -333,8 +328,6 @@ export async function DELETE(req: NextRequest) {
       'DELETE_MATCH',
       `Deleted Match #${match.matchNumber}: ${match.teamA?.name || 'TBD'} vs ${match.teamB?.name || 'TBD'}`
     );
-
-    revalidateTournamentData();
 
     return NextResponse.json({ success: true, message: 'Match deleted successfully.' });
   } catch (error: any) {

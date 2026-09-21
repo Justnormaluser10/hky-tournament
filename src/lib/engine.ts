@@ -1,17 +1,4 @@
-import { cache } from 'react';
 import { prisma } from './prisma';
-
-export const getCachedTournament = cache(async (tournamentId?: string) => {
-  return tournamentId
-    ? await prisma.tournament.findUnique({ where: { id: tournamentId } })
-    : await prisma.tournament.findFirst();
-});
-
-export const getCachedTeams = cache(async (tournamentId: string) => {
-  return await prisma.team.findMany({
-    where: { tournamentId },
-  });
-});
 
 export interface StandingRow {
   position: number;
@@ -105,13 +92,17 @@ export async function calculateStandings(tournamentId?: string): Promise<{
   standings: StandingRow[];
   tournament: any;
 }> {
-  const tournament = await getCachedTournament(tournamentId);
+  const tournament = tournamentId
+    ? await prisma.tournament.findUnique({ where: { id: tournamentId } })
+    : await prisma.tournament.findFirst();
 
   if (!tournament) {
     return { standings: [], tournament: null };
   }
 
-  const teams = await getCachedTeams(tournament.id);
+  const teams = await prisma.team.findMany({
+    where: { tournamentId: tournament.id },
+  });
 
   const matches = await prisma.match.findMany({
     where: {
@@ -215,7 +206,9 @@ export async function calculateStandings(tournamentId?: string): Promise<{
  * every team must have completed exactly (N - 1) matches (or all scheduled matches).
  */
 export async function checkLeagueStageStatus(tournamentId?: string): Promise<LeagueStageStatus> {
-  const tournament = await getCachedTournament(tournamentId);
+  const tournament = tournamentId
+    ? await prisma.tournament.findUnique({ where: { id: tournamentId } })
+    : await prisma.tournament.findFirst();
 
   if (!tournament) {
     return {
@@ -231,7 +224,10 @@ export async function checkLeagueStageStatus(tournamentId?: string): Promise<Lea
     };
   }
 
-  const teams = await getCachedTeams(tournament.id);
+  const teams = await prisma.team.findMany({
+    where: { tournamentId: tournament.id },
+    select: { id: true, name: true, shortName: true, logo: true },
+  });
 
   const teamsCount = teams.length;
   const expectedMatches = teamsCount >= 2 ? (teamsCount * (teamsCount - 1)) / 2 : 0;
@@ -788,7 +784,9 @@ export async function syncKnockoutSeeds(tournamentId: string) {
  * Calculates top scorers ranked by total goals scored.
  */
 export async function calculateTopScorers(tournamentId?: string): Promise<ScorerRow[]> {
-  const tournament = await getCachedTournament(tournamentId);
+  const tournament = tournamentId
+    ? await prisma.tournament.findUnique({ where: { id: tournamentId } })
+    : await prisma.tournament.findFirst();
 
   if (!tournament) return [];
 
@@ -872,7 +870,9 @@ export async function calculateTopScorers(tournamentId?: string): Promise<Scorer
  * Calculates top goalkeepers ranked primarily by FEWEST GOALS CONCEDED.
  */
 export async function calculateTopGoalkeepers(tournamentId?: string): Promise<GoalkeeperRow[]> {
-  const tournament = await getCachedTournament(tournamentId);
+  const tournament = tournamentId
+    ? await prisma.tournament.findUnique({ where: { id: tournamentId } })
+    : await prisma.tournament.findFirst();
 
   if (!tournament) return [];
 
@@ -953,7 +953,9 @@ export async function calculateTopGoalkeepers(tournamentId?: string): Promise<Go
 export async function calculateTeamStats(tournamentId?: string): Promise<TeamStatsSummary> {
   const { standings } = await calculateStandings(tournamentId);
 
-  const tournament = await getCachedTournament(tournamentId);
+  const tournament = tournamentId
+    ? await prisma.tournament.findUnique({ where: { id: tournamentId } })
+    : await prisma.tournament.findFirst();
 
   const allMatches = await prisma.match.findMany({
     where: { tournamentId: tournament?.id },

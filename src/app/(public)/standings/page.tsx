@@ -4,7 +4,7 @@ import { TableProperties, Trophy, ArrowRight, GitFork } from 'lucide-react';
 import { calculateStandings } from '@/lib/engine';
 import { TeamLogo } from '@/components/ui/TeamLogo';
 
-export const revalidate = 30;
+export const revalidate = 0;
 
 export default async function StandingsPage() {
   const { standings, tournament } = await calculateStandings();

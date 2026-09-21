@@ -16,7 +16,7 @@ import { calculateStandings } from '@/lib/engine';
 import { TeamLogo } from '@/components/ui/TeamLogo';
 import { SportsAvatar } from '@/components/ui/SportsAvatar';
 
-export const revalidate = 30;
+export const revalidate = 0;
 
 export default async function TeamDetailPage({
   params,

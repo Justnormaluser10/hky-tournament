@@ -25,7 +25,7 @@ import { KnockoutBracket } from '@/components/public/KnockoutBracket';
 import { ChampionCelebration } from '@/components/public/ChampionCelebration';
 import { StageTransitionBanner } from '@/components/public/StageTransitionBanner';
 
-export const revalidate = 30; // Conservative 30s ISR for live tournament freshness while protecting Netlify quotas
+export const revalidate = 0; // Dynamic server-side rendering for fresh tournament scores
 
 export default async function HomePage() {
   const tournament = await prisma.tournament.findFirst();

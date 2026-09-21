@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdmin } from '@/lib/adminGuard';
 import { logActivity } from '@/lib/activity';
-import { revalidateTournamentData } from '@/lib/revalidate';
 
 export async function GET(req: NextRequest) {
   const auth = requireAdmin(req);
@@ -86,8 +85,6 @@ export async function POST(req: NextRequest) {
       `Added player ${player.name} (#${player.jerseyNumber}, ${player.position}) to ${team.name}`
     );
 
-    revalidateTournamentData();
-
     return NextResponse.json({ success: true, player });
   } catch (error: any) {
     console.error('Error creating player:', error);
@@ -149,8 +146,6 @@ export async function PUT(req: NextRequest) {
       `Updated player ${updated.name} (#${updated.jerseyNumber})`
     );
 
-    revalidateTournamentData();
-
     return NextResponse.json({ success: true, player: updated });
   } catch (error: any) {
     console.error('Error updating player:', error);
@@ -190,8 +185,6 @@ export async function DELETE(req: NextRequest) {
       'DELETE_PLAYER',
       `Deleted player ${player.name} (#${player.jerseyNumber})`
     );
-
-    revalidateTournamentData();
 
     return NextResponse.json({ success: true, message: 'Player deleted successfully.' });
   } catch (error: any) {
