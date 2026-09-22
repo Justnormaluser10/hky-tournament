@@ -62,6 +62,7 @@ export default function AdminPlayersPage() {
   const [status, setStatus] = useState('ACTIVE');
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const fetchData = async () => {
     try {
@@ -94,6 +95,7 @@ export default function AdminPlayersPage() {
     setPhoto('');
     setIsCaptain(false);
     setStatus('ACTIVE');
+    setUploadError(null);
     setIsAddOpen(true);
   };
 
@@ -106,13 +108,23 @@ export default function AdminPlayersPage() {
     setPhoto(p.photo || '');
     setIsCaptain(p.isCaptain);
     setStatus(p.status);
+    setUploadError(null);
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (file.size > 1024 * 1024) {
+      setUploadError('Image must be 1 MB or smaller.');
+      setActionError('Image must be 1 MB or smaller.');
+      e.target.value = '';
+      return;
+    }
+
     setUploading(true);
+    setUploadError(null);
+    setActionError(null);
     const formData = new FormData();
     formData.append('file', file);
 
@@ -122,13 +134,21 @@ export default function AdminPlayersPage() {
         body: formData,
       });
       const data = await res.json();
+      if (!res.ok) {
+        setUploadError(data.error || 'Image must be 1 MB or smaller.');
+        setActionError(data.error || 'Image must be 1 MB or smaller.');
+        return;
+      }
       if (data.url) {
         setPhoto(data.url);
       }
     } catch (err) {
       console.error(err);
+      setUploadError('Failed to upload image');
+      setActionError('Failed to upload image');
     } finally {
       setUploading(false);
+      e.target.value = '';
     }
   };
 
@@ -483,6 +503,11 @@ export default function AdminPlayersPage() {
                       </button>
                     )}
                   </div>
+                  {uploadError && (
+                    <p className="text-[11px] font-bold text-rose-400 mt-1">
+                      {uploadError}
+                    </p>
+                  )}
                   <span className="text-[11px] text-slate-500 block">
                     If omitted, a professional default sports avatar silhouette is automatically used.
                   </span>

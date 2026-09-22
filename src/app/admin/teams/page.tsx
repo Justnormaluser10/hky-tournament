@@ -60,13 +60,23 @@ export default function AdminTeamsPage() {
   const [primaryColor, setPrimaryColor] = useState('#059669');
   const [logo, setLogo] = useState('');
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (file.size > 1024 * 1024) {
+      setUploadError('Image must be 1 MB or smaller.');
+      setActionError('Image must be 1 MB or smaller.');
+      e.target.value = '';
+      return;
+    }
+
     setUploadingLogo(true);
+    setUploadError(null);
+    setActionError(null);
     const formData = new FormData();
     formData.append('file', file);
 
@@ -76,13 +86,21 @@ export default function AdminTeamsPage() {
         body: formData,
       });
       const data = await res.json();
+      if (!res.ok) {
+        setUploadError(data.error || 'Image must be 1 MB or smaller.');
+        setActionError(data.error || 'Image must be 1 MB or smaller.');
+        return;
+      }
       if (data.url) {
         setLogo(data.url);
       }
     } catch (err) {
       console.error('Failed to upload logo:', err);
+      setUploadError('Failed to upload logo');
+      setActionError('Failed to upload logo');
     } finally {
       setUploadingLogo(false);
+      e.target.value = '';
     }
   };
 
@@ -111,6 +129,7 @@ export default function AdminTeamsPage() {
     setDescription('');
     setPrimaryColor('#059669');
     setLogo('');
+    setUploadError(null);
     setIsAddOpen(true);
   };
 
@@ -122,6 +141,7 @@ export default function AdminTeamsPage() {
     setDescription(t.description || '');
     setPrimaryColor(t.primaryColor || '#059669');
     setLogo(t.logo || '');
+    setUploadError(null);
   };
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -531,6 +551,11 @@ export default function AdminTeamsPage() {
                       </button>
                     )}
                   </div>
+                  {uploadError && (
+                    <p className="text-[11px] font-bold text-rose-400 mt-1">
+                      {uploadError}
+                    </p>
+                  )}
                   <span className="text-[11px] text-slate-500 block">
                     Supports PNG, JPG, WebP, SVG. If omitted, a dynamic team crest with colors and initials will be displayed.
                   </span>
@@ -687,6 +712,11 @@ export default function AdminTeamsPage() {
                       </button>
                     )}
                   </div>
+                  {uploadError && (
+                    <p className="text-[11px] font-bold text-rose-400 mt-1">
+                      {uploadError}
+                    </p>
+                  )}
                   <span className="text-[11px] text-slate-500 block">
                     Supports PNG, JPG, WebP, SVG. If omitted, a dynamic team crest with colors and initials will be displayed.
                   </span>

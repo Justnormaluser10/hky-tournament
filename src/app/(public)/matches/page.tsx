@@ -60,6 +60,33 @@ export default function MatchesPage() {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [roundFilter, setRoundFilter] = useState('ALL');
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
+  const [teamLogos, setTeamLogos] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    async function loadTeamLogos() {
+      try {
+        const res = await fetch('/api/public/teams');
+        if (res.ok) {
+          const data = await res.json();
+          const map: Record<string, string> = {};
+          for (const t of data.teams || []) {
+            if (t.id && t.logo) {
+              map[t.id] = t.logo;
+            }
+          }
+          setTeamLogos(map);
+        }
+      } catch (err) {
+        console.error('Failed to load team logos:', err);
+      }
+    }
+    loadTeamLogos();
+  }, []);
+
+  const getTeamLogo = (teamId?: string, fallbackLogo?: string | null) => {
+    if (!teamId) return fallbackLogo || undefined;
+    return teamLogos[teamId] || fallbackLogo || undefined;
+  };
 
   useEffect(() => {
     async function fetchMatches() {
@@ -301,7 +328,7 @@ export default function MatchesPage() {
                                 <TeamLogo
                                   name={match.teamA.name}
                                   shortName={match.teamA.shortName}
-                                  logo={match.teamA.logo}
+                                  logo={getTeamLogo(match.teamA?.id, match.teamA?.logo)}
                                   primaryColor={match.teamA.primaryColor}
                                   size="md"
                                 />
@@ -340,7 +367,7 @@ export default function MatchesPage() {
                                 <TeamLogo
                                   name={match.teamB.name}
                                   shortName={match.teamB.shortName}
-                                  logo={match.teamB.logo}
+                                  logo={getTeamLogo(match.teamB?.id, match.teamB?.logo)}
                                   primaryColor={match.teamB.primaryColor}
                                   size="md"
                                 />
@@ -420,7 +447,7 @@ export default function MatchesPage() {
                   <TeamLogo
                     name={selectedMatch.teamA.name}
                     shortName={selectedMatch.teamA.shortName}
-                    logo={selectedMatch.teamA.logo}
+                    logo={getTeamLogo(selectedMatch.teamA?.id, selectedMatch.teamA?.logo)}
                     primaryColor={selectedMatch.teamA.primaryColor}
                     size="md"
                     className="mx-auto mb-2"
@@ -458,7 +485,7 @@ export default function MatchesPage() {
                   <TeamLogo
                     name={selectedMatch.teamB.name}
                     shortName={selectedMatch.teamB.shortName}
-                    logo={selectedMatch.teamB.logo}
+                    logo={getTeamLogo(selectedMatch.teamB?.id, selectedMatch.teamB?.logo)}
                     primaryColor={selectedMatch.teamB.primaryColor}
                     size="md"
                     className="mx-auto mb-2"

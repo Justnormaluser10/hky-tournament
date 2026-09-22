@@ -64,11 +64,13 @@ export default function AdminTeamSquadPage({
   const [status, setStatus] = useState('ACTIVE');
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   // Team Logo Edit State
   const [isLogoOpen, setIsLogoOpen] = useState(false);
   const [teamLogo, setTeamLogo] = useState('');
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [logoUploadError, setLogoUploadError] = useState<string | null>(null);
 
   const fetchTeam = async () => {
     try {
@@ -95,11 +97,13 @@ export default function AdminTeamSquadPage({
     setPhoto('');
     setIsCaptain(false);
     setStatus('ACTIVE');
+    setUploadError(null);
     setIsAddOpen(true);
   };
 
   const openLogoModal = () => {
     setTeamLogo(team?.logo || '');
+    setLogoUploadError(null);
     setIsLogoOpen(true);
   };
 
@@ -107,7 +111,16 @@ export default function AdminTeamSquadPage({
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (file.size > 1024 * 1024) {
+      setLogoUploadError('Image must be 1 MB or smaller.');
+      setActionError('Image must be 1 MB or smaller.');
+      e.target.value = '';
+      return;
+    }
+
     setUploadingLogo(true);
+    setLogoUploadError(null);
+    setActionError(null);
     const formData = new FormData();
     formData.append('file', file);
 
@@ -117,13 +130,21 @@ export default function AdminTeamSquadPage({
         body: formData,
       });
       const data = await res.json();
+      if (!res.ok) {
+        setLogoUploadError(data.error || 'Image must be 1 MB or smaller.');
+        setActionError(data.error || 'Image must be 1 MB or smaller.');
+        return;
+      }
       if (data.url) {
         setTeamLogo(data.url);
       }
     } catch (err) {
       console.error('Failed to upload logo:', err);
+      setLogoUploadError('Failed to upload logo');
+      setActionError('Failed to upload logo');
     } finally {
       setUploadingLogo(false);
+      e.target.value = '';
     }
   };
 
@@ -168,13 +189,23 @@ export default function AdminTeamSquadPage({
     setPhoto(p.photo || '');
     setIsCaptain(p.isCaptain);
     setStatus(p.status);
+    setUploadError(null);
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (file.size > 1024 * 1024) {
+      setUploadError('Image must be 1 MB or smaller.');
+      setActionError('Image must be 1 MB or smaller.');
+      e.target.value = '';
+      return;
+    }
+
     setUploading(true);
+    setUploadError(null);
+    setActionError(null);
     const formData = new FormData();
     formData.append('file', file);
 
@@ -184,13 +215,21 @@ export default function AdminTeamSquadPage({
         body: formData,
       });
       const data = await res.json();
+      if (!res.ok) {
+        setUploadError(data.error || 'Image must be 1 MB or smaller.');
+        setActionError(data.error || 'Image must be 1 MB or smaller.');
+        return;
+      }
       if (data.url) {
         setPhoto(data.url);
       }
     } catch (err) {
       console.error(err);
+      setUploadError('Failed to upload image');
+      setActionError('Failed to upload image');
     } finally {
       setUploading(false);
+      e.target.value = '';
     }
   };
 
@@ -550,6 +589,11 @@ export default function AdminTeamSquadPage({
                       </button>
                     )}
                   </div>
+                  {uploadError && (
+                    <p className="text-[11px] font-bold text-rose-400 mt-1">
+                      {uploadError}
+                    </p>
+                  )}
                   <span className="text-[11px] text-slate-500 block">
                     If omitted, a professional default sports avatar silhouette is automatically used.
                   </span>
@@ -688,6 +732,11 @@ export default function AdminTeamSquadPage({
                   </button>
                 )}
               </div>
+              {logoUploadError && (
+                <p className="text-[11px] font-bold text-rose-400 mt-1">
+                  {logoUploadError}
+                </p>
+              )}
 
               <div className="pt-3 border-t border-white/10 flex justify-end gap-2">
                 <button

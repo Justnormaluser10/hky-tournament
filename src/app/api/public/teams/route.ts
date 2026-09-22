@@ -15,7 +15,6 @@ export async function GET() {
             jerseyNumber: true,
             position: true,
             isCaptain: true,
-            photo: true,
           },
           orderBy: { jerseyNumber: 'asc' },
         },
@@ -28,22 +27,36 @@ export async function GET() {
     const standingsMap = new Map(standings.map((s) => [s.teamId, s]));
 
     const enrichedTeams = teams.map((team) => {
-      const stats = standingsMap.get(team.id) || {
-        position: 0,
-        played: 0,
-        won: 0,
-        drawn: 0,
-        lost: 0,
-        goalsFor: 0,
-        goalsAgainst: 0,
-        goalDifference: 0,
-        points: 0,
-      };
+      const standing = standingsMap.get(team.id);
+      const stats = standing
+        ? {
+            position: standing.position,
+            played: standing.played,
+            won: standing.won,
+            drawn: standing.drawn,
+            lost: standing.lost,
+            goalsFor: standing.goalsFor,
+            goalsAgainst: standing.goalsAgainst,
+            goalDifference: standing.goalDifference,
+            points: standing.points,
+          }
+        : {
+            position: 0,
+            played: 0,
+            won: 0,
+            drawn: 0,
+            lost: 0,
+            goalsFor: 0,
+            goalsAgainst: 0,
+            goalDifference: 0,
+            points: 0,
+          };
 
       const captain = team.players.find((p) => p.isCaptain) || null;
 
       return {
         ...team,
+        logo: null,
         captain,
         playerCount: team.players.length,
         stats,

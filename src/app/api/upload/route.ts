@@ -3,6 +3,8 @@ import { writeFile, mkdir } from 'fs/promises';
 import path from 'path';
 import { requireAdmin } from '@/lib/adminGuard';
 
+const MAX_FILE_SIZE = 1024 * 1024; // 1 MB
+
 export async function POST(req: NextRequest) {
   const auth = requireAdmin(req);
   if (auth instanceof NextResponse) return auth;
@@ -15,8 +17,32 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
+    if (file.size > MAX_FILE_SIZE) {
+      return NextResponse.json(
+        { error: 'Image must be 1 MB or smaller.' },
+        { status: 400 }
+      );
+    }
+
+    const isImage =
+      file.type?.startsWith('image/') ||
+      /\.(jpe?g|png|webp|svg|gif|avif)$/i.test(file.name);
+    if (!isImage) {
+      return NextResponse.json(
+        { error: 'File must be an image.' },
+        { status: 400 }
+      );
+    }
+
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
+
+    if (buffer.length > MAX_FILE_SIZE) {
+      return NextResponse.json(
+        { error: 'Image must be 1 MB or smaller.' },
+        { status: 400 }
+      );
+    }
 
     let savedUrl = '';
     try {

@@ -25,13 +25,13 @@ export async function GET(
         },
         homeMatches: {
           include: {
-            teamB: { select: { id: true, name: true, shortName: true, logo: true } },
+            teamB: { select: { id: true, name: true, shortName: true } },
           },
           orderBy: { date: 'asc' },
         },
         awayMatches: {
           include: {
-            teamA: { select: { id: true, name: true, shortName: true, logo: true } },
+            teamA: { select: { id: true, name: true, shortName: true } },
           },
           orderBy: { date: 'asc' },
         },
@@ -44,6 +44,9 @@ export async function GET(
 
     const { standings } = await calculateStandings();
     const teamStandings = standings.find((s) => s.teamId === team.id) || null;
+    const sanitizedStandings = teamStandings
+      ? { ...teamStandings, logo: null }
+      : null;
 
     // Process players to calculate goals and cards
     const enrichedPlayers = team.players.map((p) => {
@@ -91,7 +94,7 @@ export async function GET(
         coach: team.coach,
         description: team.description,
         captain,
-        standings: teamStandings,
+        standings: sanitizedStandings,
         players: enrichedPlayers,
         matches: allMatches,
       },

@@ -20,12 +20,29 @@ export async function GET() {
         calculateTeamStats(),
       ]);
 
+    const sanitizeRow = (row: any) => ({
+      ...row,
+      photo: null,
+      teamLogo: null,
+    });
+
+    const sanitizeTeamStat = (stat: any) =>
+      stat ? { ...stat, logo: null } : null;
+
+    const sanitizedTeamStats = {
+      ...teamStats,
+      mostWins: sanitizeTeamStat(teamStats.mostWins),
+      mostGoals: sanitizeTeamStat(teamStats.mostGoals),
+      bestGD: sanitizeTeamStat(teamStats.bestGD),
+      bestDefense: sanitizeTeamStat(teamStats.bestDefense),
+    };
+
     return NextResponse.json({
-      topScorers,
-      topGoalkeepers,
-      bestDefenders,
-      manOfTheMatches,
-      teamStats,
+      topScorers: topScorers.map(sanitizeRow),
+      topGoalkeepers: topGoalkeepers.map(sanitizeRow),
+      bestDefenders: bestDefenders.map(sanitizeRow),
+      manOfTheMatches: manOfTheMatches.map(sanitizeRow),
+      teamStats: sanitizedTeamStats,
     });
   } catch (error: any) {
     console.error('Error calculating statistics:', error);
