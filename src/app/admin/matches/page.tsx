@@ -68,6 +68,20 @@ interface Match {
     stage?: string | null;
   } | null;
   events: MatchEvent[];
+  bestDefenderId?: string | null;
+  motmId?: string | null;
+  bestDefender?: {
+    id: string;
+    name: string;
+    jerseyNumber: number;
+    teamId?: string;
+  } | null;
+  motm?: {
+    id: string;
+    name: string;
+    jerseyNumber: number;
+    teamId?: string;
+  } | null;
 }
 
 interface TeamOption {
@@ -108,6 +122,8 @@ export default function AdminMatchesPage() {
   const [matchTime, setMatchTime] = useState('17:30');
   const [matchVenue, setMatchVenue] = useState('Pitch 1 - Main Turf');
   const [matchNotes, setMatchNotes] = useState('');
+  const [editBestDefenderId, setEditBestDefenderId] = useState('');
+  const [editMotmId, setEditMotmId] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   // Match Event Form in Score Modal
@@ -200,6 +216,8 @@ export default function AdminMatchesPage() {
     setMatchTime(m.time);
     setMatchVenue(m.venue);
     setMatchNotes(m.notes || '');
+    setEditBestDefenderId(m.bestDefenderId || '');
+    setEditMotmId(m.motmId || '');
     setEventTeamId(initialTeamA);
     setEventPlayerId('');
     setEditingEventId(null);
@@ -260,6 +278,8 @@ export default function AdminMatchesPage() {
           time: matchTime,
           venue: matchVenue,
           notes: matchNotes,
+          bestDefenderId: editBestDefenderId || null,
+          motmId: editMotmId || null,
         }),
       });
 
@@ -695,6 +715,24 @@ export default function AdminMatchesPage() {
                   </div>
                 </div>
 
+                {/* Match Awards Badges */}
+                {(m.motm || m.bestDefender) && (
+                  <div className="flex flex-wrap gap-2 pt-2 border-t border-white/10 text-[10px]">
+                    {m.motm && (
+                      <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold flex items-center gap-1">
+                        <span>⭐ MOTM:</span>
+                        <span>#{m.motm.jerseyNumber} {m.motm.name}</span>
+                      </span>
+                    )}
+                    {m.bestDefender && (
+                      <span className="px-2 py-0.5 rounded-md bg-teal-500/20 text-teal-300 border border-teal-500/30 font-bold flex items-center gap-1">
+                        <span>🛡️ Best Def:</span>
+                        <span>#{m.bestDefender.jerseyNumber} {m.bestDefender.name}</span>
+                      </span>
+                    )}
+                  </div>
+                )}
+
                 {/* Footer and Edit Score CTA */}
                 <div className="pt-3 border-t border-white/10 flex items-center justify-between text-xs">
                   <div className="text-xs text-slate-200 font-semibold truncate max-w-[60%]">
@@ -904,6 +942,85 @@ export default function AdminMatchesPage() {
                   placeholder="Fixture notes or details..."
                   className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/10 text-white text-xs focus:border-emerald-500 focus:outline-none"
                 />
+              </div>
+
+              {/* MATCH HONOURS & AWARDS (BEST DEFENDER & MAN OF THE MATCH) */}
+              <div className="p-4 rounded-xl bg-slate-950 border border-amber-500/30 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold uppercase text-amber-400 tracking-wider flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                    Official Match Awards (Full Admin Editability)
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    Idempotent • Reassignment updates leaderboard
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* MAN OF THE MATCH */}
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase text-slate-300 mb-1">
+                      ⭐ Man of the Match (MOTM)
+                    </label>
+                    <select
+                      value={editMotmId}
+                      onChange={(e) => setEditMotmId(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/15 text-white text-xs font-semibold focus:border-amber-400 focus:outline-none"
+                    >
+                      <option value="">-- None Selected / Unassigned --</option>
+                      {teamAPlayers.length > 0 && (
+                        <optgroup label={`${teams.find((t) => t.id === editTeamAId)?.shortName || 'Home Team'} Players`}>
+                          {teamAPlayers.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              #{p.jerseyNumber} {p.name} ({p.position})
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                      {teamBPlayers.length > 0 && (
+                        <optgroup label={`${teams.find((t) => t.id === editTeamBId)?.shortName || 'Away Team'} Players`}>
+                          {teamBPlayers.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              #{p.jerseyNumber} {p.name} ({p.position})
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                    </select>
+                  </div>
+
+                  {/* BEST DEFENDER */}
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase text-slate-300 mb-1">
+                      🛡️ Best Defender of the Match
+                    </label>
+                    <select
+                      value={editBestDefenderId}
+                      onChange={(e) => setEditBestDefenderId(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/15 text-white text-xs font-semibold focus:border-emerald-400 focus:outline-none"
+                    >
+                      <option value="">-- None Selected / Unassigned --</option>
+                      {teamAPlayers.length > 0 && (
+                        <optgroup label={`${teams.find((t) => t.id === editTeamAId)?.shortName || 'Home Team'} Players`}>
+                          {teamAPlayers.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              #{p.jerseyNumber} {p.name} ({p.position})
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                      {teamBPlayers.length > 0 && (
+                        <optgroup label={`${teams.find((t) => t.id === editTeamBId)?.shortName || 'Away Team'} Players`}>
+                          {teamBPlayers.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              #{p.jerseyNumber} {p.name} ({p.position})
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                    </select>
+                  </div>
+                </div>
               </div>
 
               {/* Save Match Score & Recalculate */}

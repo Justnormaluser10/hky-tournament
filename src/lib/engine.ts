@@ -17,6 +17,8 @@ export interface StandingRow {
   points: number;
   form: string[];
   isQualified: boolean;
+  isOverridden?: boolean;
+  overrideNotes?: string | null;
 }
 
 export interface ScorerRow {
@@ -34,6 +36,7 @@ export interface ScorerRow {
   primaryColor: string;
   goals: number;
   matchesPlayed: number;
+  isOverridden?: boolean;
 }
 
 export interface GoalkeeperRow {
@@ -51,6 +54,25 @@ export interface GoalkeeperRow {
   goalsConceded: number;
   cleanSheets: number;
   goalsPerMatch: number;
+  isOverridden?: boolean;
+}
+
+export interface AwardWinnerRow {
+  rank: number;
+  playerId: string;
+  playerName: string;
+  jerseyNumber: number;
+  position: string;
+  photo: string | null;
+  isCaptain: boolean;
+  teamId: string;
+  teamName: string;
+  teamShortName: string;
+  teamLogo: string | null;
+  primaryColor: string;
+  awardsCount: number;
+  matchesPlayed: number;
+  isOverridden?: boolean;
 }
 
 export interface TeamStatsSummary {
@@ -86,7 +108,8 @@ export interface LeagueStageStatus {
 }
 
 /**
- * Calculates deterministic league standings directly from match records and tournament configuration.
+ * Calculates deterministic league standings directly from match records and tournament configuration,
+ * with support for official administrative StandingOverride corrections.
  */
 export async function calculateStandings(tournamentId?: string): Promise<{
   standings: StandingRow[];
@@ -113,6 +136,11 @@ export async function calculateStandings(tournamentId?: string): Promise<{
     orderBy: { date: 'asc' },
   });
 
+  const overrides = await prisma.standingOverride.findMany({
+    where: { tournamentId: tournament.id },
+  });
+  const overrideMap = new Map(overrides.map((o) => [o.teamId, o]));
+
   const statsMap: Record<string, StandingRow> = {};
   for (const team of teams) {
     statsMap[team.id] = {
@@ -132,6 +160,8 @@ export async function calculateStandings(tournamentId?: string): Promise<{
       points: 0,
       form: [],
       isQualified: false,
+      isOverridden: false,
+      overrideNotes: null,
     };
   }
 
@@ -176,29 +206,71 @@ export async function calculateStandings(tournamentId?: string): Promise<{
     }
   }
 
+  let hasExplicitPositionOverride = false;
+
   const rows = Object.values(statsMap).map((row) => {
     row.goalDifference = row.goalsFor - row.goalsAgainst;
     row.form = row.form.slice(-5);
+
+    const ov = overrideMap.get(row.teamId);
+    if (ov) {
+      row.isOverridden = true;
+      row.overrideNotes = ov.notes;
+      if (ov.played !== null && ov.played !== undefined) row.played = ov.played;
+      if (ov.won !== null && ov.won !== undefined) row.won = ov.won;
+      if (ov.drawn !== null && ov.drawn !== undefined) row.drawn = ov.drawn;
+      if (ov.lost !== null && ov.lost !== undefined) row.lost = ov.lost;
+      if (ov.goalsFor !== null && ov.goalsFor !== undefined) row.goalsFor = ov.goalsFor;
+      if (ov.goalsAgainst !== null && ov.goalsAgainst !== undefined) row.goalsAgainst = ov.goalsAgainst;
+      if (ov.goalDifference !== null && ov.goalDifference !== undefined) {
+        row.goalDifference = ov.goalDifference;
+      } else {
+        row.goalDifference = row.goalsFor - row.goalsAgainst;
+      }
+      if (ov.points !== null && ov.points !== undefined) row.points = ov.points;
+      if (ov.position !== null && ov.position !== undefined && ov.position > 0) {
+        row.position = ov.position;
+        hasExplicitPositionOverride = true;
+      }
+    }
+
     return row;
   });
 
   // Sort by Points DESC, GD DESC, GF DESC, Wins DESC, Name ASC
-  rows.sort((a, b) => {
-    if (b.points !== a.points) return b.points - a.points;
-    if (b.goalDifference !== a.goalDifference) return b.goalDifference - a.goalDifference;
-    if (b.goalsFor !== a.goalsFor) return b.goalsFor - a.goalsFor;
-    if (b.won !== a.won) return b.won - a.won;
-    return a.name.localeCompare(b.name);
-  });
+  // If an administrator set explicit positions, sort by those positions first
+  if (hasExplicitPositionOverride) {
+    rows.sort((a, b) => {
+      const posA = a.position > 0 ? a.position : 9999;
+      const posB = b.position > 0 ? b.position : 9999;
+      if (posA !== posB) return posA - posB;
+      if (b.points !== a.points) return b.points - a.points;
+      if (b.goalDifference !== a.goalDifference) return b.goalDifference - a.goalDifference;
+      if (b.goalsFor !== a.goalsFor) return b.goalsFor - a.goalsFor;
+      if (b.won !== a.won) return b.won - a.won;
+      return a.name.localeCompare(b.name);
+    });
+  } else {
+    rows.sort((a, b) => {
+      if (b.points !== a.points) return b.points - a.points;
+      if (b.goalDifference !== a.goalDifference) return b.goalDifference - a.goalDifference;
+      if (b.goalsFor !== a.goalsFor) return b.goalsFor - a.goalsFor;
+      if (b.won !== a.won) return b.won - a.won;
+      return a.name.localeCompare(b.name);
+    });
+  }
 
   const qualificationCount = tournament.qualificationCount || 4;
   rows.forEach((r, idx) => {
-    r.position = idx + 1;
+    if (!hasExplicitPositionOverride || r.position <= 0) {
+      r.position = idx + 1;
+    }
     r.isQualified = r.position <= qualificationCount;
   });
 
   return { standings: rows, tournament };
 }
+
 
 /**
  * Checks whether the round-robin league stage has 100% completed.
@@ -781,7 +853,8 @@ export async function syncKnockoutSeeds(tournamentId: string) {
 }
 
 /**
- * Calculates top scorers ranked by total goals scored.
+ * Calculates top scorers ranked by total goals scored,
+ * supporting official administrative corrections.
  */
 export async function calculateTopScorers(tournamentId?: string): Promise<ScorerRow[]> {
   const tournament = tournamentId
@@ -810,6 +883,7 @@ export async function calculateTopScorers(tournamentId?: string): Promise<Scorer
       player: any;
       team: any;
       goals: number;
+      isOverridden?: boolean;
     }
   > = {};
 
@@ -821,9 +895,38 @@ export async function calculateTopScorers(tournamentId?: string): Promise<Scorer
         player: event.player,
         team: event.team,
         goals: 0,
+        isOverridden: false,
       };
     }
     playerGoalsMap[pid].goals += 1;
+  }
+
+  // Check for administrative goal overrides
+  const statOverrides = await prisma.playerStatOverride.findMany({
+    where: { tournamentId: tournament.id },
+  });
+
+  for (const ov of statOverrides) {
+    if (ov.goals !== null && ov.goals !== undefined) {
+      if (playerGoalsMap[ov.playerId]) {
+        playerGoalsMap[ov.playerId].goals = ov.goals;
+        playerGoalsMap[ov.playerId].isOverridden = true;
+      } else {
+        // Player had 0 goal events registered, but admin credited goals
+        const p = await prisma.player.findUnique({
+          where: { id: ov.playerId },
+          include: { team: true },
+        });
+        if (p) {
+          playerGoalsMap[ov.playerId] = {
+            player: p,
+            team: p.team,
+            goals: ov.goals,
+            isOverridden: true,
+          };
+        }
+      }
+    }
   }
 
   const completedMatches = await prisma.match.findMany({
@@ -837,22 +940,25 @@ export async function calculateTopScorers(tournamentId?: string): Promise<Scorer
     if (m.teamBId) teamMatchCount[m.teamBId] = (teamMatchCount[m.teamBId] || 0) + 1;
   }
 
-  const scorers: ScorerRow[] = Object.values(playerGoalsMap).map((entry) => ({
-    rank: 0,
-    playerId: entry.player.id,
-    playerName: entry.player.name,
-    jerseyNumber: entry.player.jerseyNumber,
-    position: entry.player.position,
-    photo: entry.player.photo,
-    isCaptain: entry.player.isCaptain,
-    teamId: entry.team.id,
-    teamName: entry.team.name,
-    teamShortName: entry.team.shortName,
-    teamLogo: entry.team.logo,
-    primaryColor: entry.team.primaryColor,
-    goals: entry.goals,
-    matchesPlayed: teamMatchCount[entry.team.id] || 0,
-  }));
+  const scorers: ScorerRow[] = Object.values(playerGoalsMap)
+    .filter((entry) => entry.goals > 0)
+    .map((entry) => ({
+      rank: 0,
+      playerId: entry.player.id,
+      playerName: entry.player.name,
+      jerseyNumber: entry.player.jerseyNumber,
+      position: entry.player.position,
+      photo: entry.player.photo,
+      isCaptain: entry.player.isCaptain,
+      teamId: entry.team.id,
+      teamName: entry.team.name,
+      teamShortName: entry.team.shortName,
+      teamLogo: entry.team.logo,
+      primaryColor: entry.team.primaryColor,
+      goals: entry.goals,
+      matchesPlayed: teamMatchCount[entry.team.id] || 0,
+      isOverridden: entry.isOverridden,
+    }));
 
   scorers.sort((a, b) => {
     if (b.goals !== a.goals) return b.goals - a.goals;
@@ -867,7 +973,8 @@ export async function calculateTopScorers(tournamentId?: string): Promise<Scorer
 }
 
 /**
- * Calculates top goalkeepers ranked primarily by FEWEST GOALS CONCEDED.
+ * Calculates top goalkeepers ranked primarily by FEWEST GOALS CONCEDED,
+ * supporting official administrative corrections.
  */
 export async function calculateTopGoalkeepers(tournamentId?: string): Promise<GoalkeeperRow[]> {
   const tournament = tournamentId
@@ -893,6 +1000,11 @@ export async function calculateTopGoalkeepers(tournamentId?: string): Promise<Go
     },
   });
 
+  const statOverrides = await prisma.playerStatOverride.findMany({
+    where: { tournamentId: tournament.id },
+  });
+  const overrideMap = new Map(statOverrides.map((o) => [o.playerId, o]));
+
   const rows: GoalkeeperRow[] = [];
 
   for (const gk of goalkeepers) {
@@ -900,8 +1012,7 @@ export async function calculateTopGoalkeepers(tournamentId?: string): Promise<Go
       (m) => (m.teamAId && m.teamAId === gk.teamId) || (m.teamBId && m.teamBId === gk.teamId)
     );
 
-    const matchesCount = teamMatches.length;
-    if (matchesCount === 0) continue;
+    let matchesCount = teamMatches.length;
 
     let goalsConceded = 0;
     let cleanSheets = 0;
@@ -914,7 +1025,27 @@ export async function calculateTopGoalkeepers(tournamentId?: string): Promise<Go
       }
     }
 
-    const goalsPerMatch = Number((goalsConceded / matchesCount).toFixed(2));
+    const ov = overrideMap.get(gk.id);
+    let isOverridden = false;
+    if (ov) {
+      if (ov.goalsConceded !== null && ov.goalsConceded !== undefined) {
+        goalsConceded = ov.goalsConceded;
+        isOverridden = true;
+      }
+      if (ov.cleanSheets !== null && ov.cleanSheets !== undefined) {
+        cleanSheets = ov.cleanSheets;
+        isOverridden = true;
+      }
+      if (ov.matchesPlayed !== null && ov.matchesPlayed !== undefined) {
+        matchesCount = ov.matchesPlayed;
+        isOverridden = true;
+      }
+    }
+
+    if (matchesCount === 0 && !isOverridden) continue;
+
+    const goalsPerMatch =
+      matchesCount > 0 ? Number((goalsConceded / matchesCount).toFixed(2)) : 0;
 
     rows.push({
       rank: 0,
@@ -931,6 +1062,7 @@ export async function calculateTopGoalkeepers(tournamentId?: string): Promise<Go
       goalsConceded,
       cleanSheets,
       goalsPerMatch,
+      isOverridden,
     });
   }
 
@@ -946,6 +1078,195 @@ export async function calculateTopGoalkeepers(tournamentId?: string): Promise<Go
 
   return rows;
 }
+
+/**
+ * Calculates Best Defender ranking based on match award selections (Match.bestDefenderId),
+ * supporting administrative corrections. Idempotent: counts are derived directly from matches.
+ */
+export async function calculateBestDefenders(tournamentId?: string): Promise<AwardWinnerRow[]> {
+  const tournament = tournamentId
+    ? await prisma.tournament.findUnique({ where: { id: tournamentId } })
+    : await prisma.tournament.findFirst();
+
+  if (!tournament) return [];
+
+  // Completed or in-progress matches
+  const matches = await prisma.match.findMany({
+    where: {
+      tournamentId: tournament.id,
+      status: { in: ['COMPLETED', 'LIVE'] },
+      bestDefenderId: { not: null },
+    },
+    select: { id: true, bestDefenderId: true },
+  });
+
+  // Calculate award counts per player
+  const countMap: Record<string, number> = {};
+  for (const m of matches) {
+    if (m.bestDefenderId) {
+      countMap[m.bestDefenderId] = (countMap[m.bestDefenderId] || 0) + 1;
+    }
+  }
+
+  // Administrative overrides
+  const statOverrides = await prisma.playerStatOverride.findMany({
+    where: { tournamentId: tournament.id },
+  });
+  const overrideMap = new Map(statOverrides.map((o) => [o.playerId, o]));
+
+  for (const ov of statOverrides) {
+    if (ov.bestDefenderAwards !== null && ov.bestDefenderAwards !== undefined) {
+      countMap[ov.playerId] = ov.bestDefenderAwards;
+    }
+  }
+
+  const completedMatches = await prisma.match.findMany({
+    where: { tournamentId: tournament.id, status: 'COMPLETED' },
+    select: { teamAId: true, teamBId: true },
+  });
+  const teamMatchCount: Record<string, number> = {};
+  for (const m of completedMatches) {
+    if (m.teamAId) teamMatchCount[m.teamAId] = (teamMatchCount[m.teamAId] || 0) + 1;
+    if (m.teamBId) teamMatchCount[m.teamBId] = (teamMatchCount[m.teamBId] || 0) + 1;
+  }
+
+  // Fetch players with awards or overrides
+  const playerIds = Object.keys(countMap).filter((id) => countMap[id] > 0);
+  if (playerIds.length === 0) return [];
+
+  const players = await prisma.player.findMany({
+    where: { id: { in: playerIds } },
+    include: { team: true },
+  });
+
+  const rows: AwardWinnerRow[] = players.map((p) => {
+    const ov = overrideMap.get(p.id);
+    const isOverridden = ov?.bestDefenderAwards !== null && ov?.bestDefenderAwards !== undefined;
+    return {
+      rank: 0,
+      playerId: p.id,
+      playerName: p.name,
+      jerseyNumber: p.jerseyNumber,
+      position: p.position,
+      photo: p.photo,
+      isCaptain: p.isCaptain,
+      teamId: p.team.id,
+      teamName: p.team.name,
+      teamShortName: p.team.shortName,
+      teamLogo: p.team.logo,
+      primaryColor: p.team.primaryColor,
+      awardsCount: countMap[p.id] || 0,
+      matchesPlayed: teamMatchCount[p.team.id] || 0,
+      isOverridden,
+    };
+  });
+
+  rows.sort((a, b) => {
+    if (b.awardsCount !== a.awardsCount) return b.awardsCount - a.awardsCount;
+    return a.playerName.localeCompare(b.playerName);
+  });
+
+  rows.forEach((r, idx) => {
+    r.rank = idx + 1;
+  });
+
+  return rows;
+}
+
+/**
+ * Calculates Man of the Match (MOTM) ranking based on match award selections (Match.motmId),
+ * supporting administrative corrections. Idempotent: counts are derived directly from matches.
+ */
+export async function calculateManOfTheMatches(tournamentId?: string): Promise<AwardWinnerRow[]> {
+  const tournament = tournamentId
+    ? await prisma.tournament.findUnique({ where: { id: tournamentId } })
+    : await prisma.tournament.findFirst();
+
+  if (!tournament) return [];
+
+  // Completed or in-progress matches
+  const matches = await prisma.match.findMany({
+    where: {
+      tournamentId: tournament.id,
+      status: { in: ['COMPLETED', 'LIVE'] },
+      motmId: { not: null },
+    },
+    select: { id: true, motmId: true },
+  });
+
+  // Calculate award counts per player
+  const countMap: Record<string, number> = {};
+  for (const m of matches) {
+    if (m.motmId) {
+      countMap[m.motmId] = (countMap[m.motmId] || 0) + 1;
+    }
+  }
+
+  // Administrative overrides
+  const statOverrides = await prisma.playerStatOverride.findMany({
+    where: { tournamentId: tournament.id },
+  });
+  const overrideMap = new Map(statOverrides.map((o) => [o.playerId, o]));
+
+  for (const ov of statOverrides) {
+    if (ov.motmAwards !== null && ov.motmAwards !== undefined) {
+      countMap[ov.playerId] = ov.motmAwards;
+    }
+  }
+
+  const completedMatches = await prisma.match.findMany({
+    where: { tournamentId: tournament.id, status: 'COMPLETED' },
+    select: { teamAId: true, teamBId: true },
+  });
+  const teamMatchCount: Record<string, number> = {};
+  for (const m of completedMatches) {
+    if (m.teamAId) teamMatchCount[m.teamAId] = (teamMatchCount[m.teamAId] || 0) + 1;
+    if (m.teamBId) teamMatchCount[m.teamBId] = (teamMatchCount[m.teamBId] || 0) + 1;
+  }
+
+  // Fetch players with awards or overrides
+  const playerIds = Object.keys(countMap).filter((id) => countMap[id] > 0);
+  if (playerIds.length === 0) return [];
+
+  const players = await prisma.player.findMany({
+    where: { id: { in: playerIds } },
+    include: { team: true },
+  });
+
+  const rows: AwardWinnerRow[] = players.map((p) => {
+    const ov = overrideMap.get(p.id);
+    const isOverridden = ov?.motmAwards !== null && ov?.motmAwards !== undefined;
+    return {
+      rank: 0,
+      playerId: p.id,
+      playerName: p.name,
+      jerseyNumber: p.jerseyNumber,
+      position: p.position,
+      photo: p.photo,
+      isCaptain: p.isCaptain,
+      teamId: p.team.id,
+      teamName: p.team.name,
+      teamShortName: p.team.shortName,
+      teamLogo: p.team.logo,
+      primaryColor: p.team.primaryColor,
+      awardsCount: countMap[p.id] || 0,
+      matchesPlayed: teamMatchCount[p.team.id] || 0,
+      isOverridden,
+    };
+  });
+
+  rows.sort((a, b) => {
+    if (b.awardsCount !== a.awardsCount) return b.awardsCount - a.awardsCount;
+    return a.playerName.localeCompare(b.playerName);
+  });
+
+  rows.forEach((r, idx) => {
+    r.rank = idx + 1;
+  });
+
+  return rows;
+}
+
 
 /**
  * Calculates overarching team statistics (Most Wins, Most Goals, Best GD, Clean Sheets).

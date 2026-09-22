@@ -20,6 +20,8 @@ export async function GET(req: NextRequest) {
           },
           orderBy: { minute: 'asc' },
         },
+        bestDefender: { select: { id: true, name: true, jerseyNumber: true, teamId: true } },
+        motm: { select: { id: true, name: true, jerseyNumber: true, teamId: true } },
         knockout: true,
       },
       orderBy: [{ matchNumber: 'asc' }, { date: 'asc' }],
@@ -37,7 +39,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { round, teamAId, teamBId, date, time, venue, status, notes } = body;
+    const { round, teamAId, teamBId, date, time, venue, status, notes, bestDefenderId, motmId } = body;
 
     if (!teamAId || !teamBId) {
       return NextResponse.json({ error: 'Both teams are required.' }, { status: 400 });
@@ -73,10 +75,14 @@ export async function POST(req: NextRequest) {
         venue: venue || 'Pitch 1 - Main Turf',
         status: status || 'UPCOMING',
         notes: notes?.trim() || null,
+        bestDefenderId: bestDefenderId || null,
+        motmId: motmId || null,
       },
       include: {
         teamA: { select: { name: true, shortName: true } },
         teamB: { select: { name: true, shortName: true } },
+        bestDefender: { select: { id: true, name: true, jerseyNumber: true, teamId: true } },
+        motm: { select: { id: true, name: true, jerseyNumber: true, teamId: true } },
       },
     });
 
@@ -99,8 +105,21 @@ export async function PUT(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { id, teamAScore, teamBScore, status, round, date, time, venue, notes, teamAId, teamBId } =
-      body;
+    const {
+      id,
+      teamAScore,
+      teamBScore,
+      status,
+      round,
+      date,
+      time,
+      venue,
+      notes,
+      teamAId,
+      teamBId,
+      bestDefenderId,
+      motmId,
+    } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'Match ID is required.' }, { status: 400 });
@@ -213,6 +232,8 @@ export async function PUT(req: NextRequest) {
         time: time !== undefined ? time : undefined,
         venue: venue !== undefined ? venue : undefined,
         notes: notes !== undefined ? notes : undefined,
+        bestDefenderId: bestDefenderId !== undefined ? (bestDefenderId || null) : undefined,
+        motmId: motmId !== undefined ? (motmId || null) : undefined,
       },
       include: {
         teamA: { select: { id: true, name: true, shortName: true } },
@@ -224,8 +245,11 @@ export async function PUT(req: NextRequest) {
           },
           orderBy: { minute: 'asc' },
         },
+        bestDefender: { select: { id: true, name: true, jerseyNumber: true, teamId: true } },
+        motm: { select: { id: true, name: true, jerseyNumber: true, teamId: true } },
       },
     });
+
 
     // Automatically advance knockout winners or trigger seeding recalculation
     try {
@@ -279,13 +303,31 @@ export async function PUT(req: NextRequest) {
     const scoreChanged =
       currentMatch.teamAScore !== updated.teamAScore || currentMatch.teamBScore !== updated.teamBScore;
 
+    if (currentMatch.bestDefenderId !== updated.bestDefenderId) {
+      const awardWinner = updated.bestDefender ? `${updated.bestDefender.name} (#${updated.bestDefender.jerseyNumber})` : 'Cleared';
+      await logActivity(
+        auth.admin.email,
+        'BEST_DEFENDER_AWARDED',
+        `Best Defender for Match #${updated.matchNumber} set to: ${awardWinner}`
+      );
+    }
+
+    if (currentMatch.motmId !== updated.motmId) {
+      const awardWinner = updated.motm ? `${updated.motm.name} (#${updated.motm.jerseyNumber})` : 'Cleared';
+      await logActivity(
+        auth.admin.email,
+        'MOTM_AWARDED',
+        `Man of the Match for Match #${updated.matchNumber} set to: ${awardWinner}`
+      );
+    }
+
     if (scoreChanged) {
       await logActivity(
         auth.admin.email,
         'SCORE_EDITED',
         `Admin changed Match #${updated.matchNumber} (${updated.teamA?.name || 'TBD'} vs ${updated.teamB?.name || 'TBD'}) score from ${currentMatch.teamAScore}–${currentMatch.teamBScore} to ${updated.teamAScore}–${updated.teamBScore}. (Status: ${updated.status})`
       );
-    } else if (!teamsChanged) {
+    } else if (!teamsChanged && currentMatch.bestDefenderId === updated.bestDefenderId && currentMatch.motmId === updated.motmId) {
       await logActivity(
         auth.admin.email,
         'MATCH_UPDATED',

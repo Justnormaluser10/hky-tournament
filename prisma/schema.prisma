@@ -32,64 +32,74 @@ model Tournament {
   announcements      Announcement[]
   matches            Match[]
   teams              Team[]
+  standingOverrides  StandingOverride[]
+  playerStatOverrides PlayerStatOverride[]
 }
 
 model Team {
-  id           String       @id @default(cuid())
-  tournamentId String
-  name         String
-  shortName    String
-  logo         String?
-  captainId    String?
-  coach        String?
-  description  String?
-  primaryColor String       @default("#059669")
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
-  awayMatches  Match[]      @relation("TeamB")
-  homeMatches  Match[]      @relation("TeamA")
-  matchEvents  MatchEvent[]
-  players      Player[]
-  tournament   Tournament   @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  id               String            @id @default(cuid())
+  tournamentId     String
+  name             String
+  shortName        String
+  logo             String?
+  captainId        String?
+  coach            String?
+  description      String?
+  primaryColor     String            @default("#059669")
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  awayMatches      Match[]           @relation("TeamB")
+  homeMatches      Match[]           @relation("TeamA")
+  matchEvents      MatchEvent[]
+  players          Player[]
+  tournament       Tournament        @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  standingOverride StandingOverride?
 }
 
 model Player {
-  id           String       @id @default(cuid())
-  teamId       String
-  name         String
-  jerseyNumber Int
-  position     String
-  photo        String?
-  status       String       @default("ACTIVE")
-  isCaptain    Boolean      @default(false)
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
-  matchEvents  MatchEvent[]
-  team         Team         @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  id                  String              @id @default(cuid())
+  teamId              String
+  name                String
+  jerseyNumber        Int
+  position            String
+  photo               String?
+  status              String              @default("ACTIVE")
+  isCaptain           Boolean             @default(false)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  matchEvents         MatchEvent[]
+  team                Team                @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  bestDefenderMatches Match[]             @relation("MatchBestDefender")
+  motmMatches         Match[]             @relation("MatchMOTM")
+  statOverride        PlayerStatOverride?
 }
 
 model Match {
-  id           String         @id @default(cuid())
-  tournamentId String
-  round        String         @default("LEAGUE")
-  matchNumber  Int
-  teamAId      String?
-  teamBId      String?
-  teamAScore   Int            @default(0)
-  teamBScore   Int            @default(0)
-  date         DateTime       @default(now())
-  time         String         @default("17:30")
-  venue        String         @default("Pitch 1")
-  status       String         @default("UPCOMING")
-  notes        String?
-  winnerId     String?
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  knockout     KnockoutMatch?
-  teamB        Team?          @relation("TeamB", fields: [teamBId], references: [id], onDelete: Cascade)
-  teamA        Team?          @relation("TeamA", fields: [teamAId], references: [id], onDelete: Cascade)
-  tournament   Tournament     @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
-  events       MatchEvent[]
+  id             String         @id @default(cuid())
+  tournamentId   String
+  round          String         @default("LEAGUE")
+  matchNumber    Int
+  teamAId        String?
+  teamBId        String?
+  teamAScore     Int            @default(0)
+  teamBScore     Int            @default(0)
+  date           DateTime       @default(now())
+  time           String         @default("17:30")
+  venue          String         @default("Pitch 1")
+  status         String         @default("UPCOMING")
+  notes          String?
+  winnerId       String?
+  bestDefenderId String?
+  motmId         String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  knockout       KnockoutMatch?
+  teamB          Team?          @relation("TeamB", fields: [teamBId], references: [id], onDelete: Cascade)
+  teamA          Team?          @relation("TeamA", fields: [teamAId], references: [id], onDelete: Cascade)
+  tournament     Tournament     @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  events         MatchEvent[]
+  bestDefender   Player?        @relation("MatchBestDefender", fields: [bestDefenderId], references: [id])
+  motm           Player?        @relation("MatchMOTM", fields: [motmId], references: [id])
 }
 
 model MatchEvent {
@@ -131,6 +141,43 @@ model Announcement {
   tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
 }
 
+model StandingOverride {
+  id             String     @id @default(cuid())
+  tournamentId   String
+  teamId         String     @unique
+  played         Int?
+  won            Int?
+  drawn          Int?
+  lost           Int?
+  goalsFor       Int?
+  goalsAgainst   Int?
+  goalDifference Int?
+  points         Int?
+  position       Int?
+  notes          String?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  team           Team       @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  tournament     Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+}
+
+model PlayerStatOverride {
+  id                 String     @id @default(cuid())
+  tournamentId       String
+  playerId           String     @unique
+  goals              Int?
+  goalsConceded      Int?
+  cleanSheets        Int?
+  matchesPlayed      Int?
+  bestDefenderAwards Int?
+  motmAwards         Int?
+  notes              String?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  player             Player     @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  tournament         Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+}
+
 model Admin {
   id           String   @id @default(cuid())
   email        String   @unique
@@ -148,3 +195,4 @@ model ActivityLog {
   description String
   createdAt   DateTime @default(now())
 }
+

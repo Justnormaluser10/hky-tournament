@@ -9,6 +9,7 @@ import {
   Sparkles,
   Flame,
   Shield,
+  Award,
   ArrowRight,
   Megaphone,
 } from 'lucide-react';
@@ -17,6 +18,8 @@ import {
   calculateStandings,
   calculateTopScorers,
   calculateTopGoalkeepers,
+  calculateBestDefenders,
+  calculateManOfTheMatches,
   checkLeagueStageStatus,
 } from '@/lib/engine';
 import { TeamLogo } from '@/components/ui/TeamLogo';
@@ -32,10 +35,17 @@ export default async function HomePage() {
   let currentStage = tournament?.currentStage || 'LEAGUE';
   const qualificationCount = tournament?.qualificationCount || 4;
 
-  const leagueStatus = await checkLeagueStageStatus(tournament?.id);
-  const { standings } = await calculateStandings(tournament?.id);
-  const topScorers = await calculateTopScorers(tournament?.id);
-  const topGoalkeepers = await calculateTopGoalkeepers(tournament?.id);
+  const [leagueStatus, standingsResult, topScorers, topGoalkeepers, bestDefenders, manOfTheMatches] =
+    await Promise.all([
+      checkLeagueStageStatus(tournament?.id),
+      calculateStandings(tournament?.id),
+      calculateTopScorers(tournament?.id),
+      calculateTopGoalkeepers(tournament?.id),
+      calculateBestDefenders(tournament?.id),
+      calculateManOfTheMatches(tournament?.id),
+    ]);
+
+  const standings = standingsResult.standings;
 
   // Self-heal: If league is not complete, stage must remain LEAGUE
   if (!leagueStatus.isComplete && currentStage !== 'LEAGUE' && tournament?.id) {
@@ -562,7 +572,7 @@ export default async function HomePage() {
           </section>
         )}
 
-        {/* 6. TOURNAMENT STATS SPOTLIGHT (Golden Stick & Top Goalkeeper) */}
+        {/* 6. TOURNAMENT STATS SPOTLIGHT (ALL 4 HONOURS: TOP SCORER, GOALKEEPER, BEST DEFENDER, MOTM) */}
         <section className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-black uppercase text-white tracking-wider flex items-center gap-2">
@@ -578,27 +588,27 @@ export default async function HomePage() {
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Top Scorer */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* 1. Top Scorer */}
             <div className="glass-card rounded-2xl p-4 border border-emerald-500/20 flex items-center justify-between">
               {topScorers.length > 0 ? (
                 <>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
                     <SportsAvatar
                       photo={topScorers[0].photo}
                       name={topScorers[0].playerName}
                       jerseyNumber={topScorers[0].jerseyNumber}
                       size="md"
                     />
-                    <div>
-                      <span className="text-[10px] font-black uppercase text-amber-400 block">
+                    <div className="min-w-0">
+                      <span className="text-[10px] font-black uppercase text-amber-400 block truncate">
                         Golden Stick Leader
                       </span>
-                      <h4 className="font-extrabold text-white text-sm">{topScorers[0].playerName}</h4>
-                      <p className="text-xs text-slate-400">{topScorers[0].teamName}</p>
+                      <h4 className="font-extrabold text-white text-sm truncate">{topScorers[0].playerName}</h4>
+                      <p className="text-xs text-slate-400 truncate">{topScorers[0].teamName}</p>
                     </div>
                   </div>
-                  <div className="text-right">
+                  <div className="text-right shrink-0 ml-2">
                     <span className="font-mono font-black text-2xl text-amber-400">
                       {topScorers[0].goals}
                     </span>
@@ -612,28 +622,28 @@ export default async function HomePage() {
               )}
             </div>
 
-            {/* Top Goalkeeper */}
+            {/* 2. Top Goalkeeper */}
             <div className="glass-card rounded-2xl p-4 border border-teal-500/20 flex items-center justify-between">
               {topGoalkeepers.length > 0 ? (
                 <>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
                     <SportsAvatar
                       photo={topGoalkeepers[0].photo}
                       name={topGoalkeepers[0].playerName}
                       jerseyNumber={topGoalkeepers[0].jerseyNumber}
                       size="md"
                     />
-                    <div>
-                      <span className="text-[10px] font-black uppercase text-teal-400 block">
-                        Top Goalkeeper (Fewest Conceded)
+                    <div className="min-w-0">
+                      <span className="text-[10px] font-black uppercase text-teal-400 block truncate">
+                        Top Goalkeeper
                       </span>
-                      <h4 className="font-extrabold text-white text-sm">{topGoalkeepers[0].playerName}</h4>
-                      <p className="text-xs text-slate-400">
-                        {topGoalkeepers[0].teamName} • {topGoalkeepers[0].cleanSheets} Clean Sheets
+                      <h4 className="font-extrabold text-white text-sm truncate">{topGoalkeepers[0].playerName}</h4>
+                      <p className="text-xs text-slate-400 truncate">
+                        {topGoalkeepers[0].teamName} • {topGoalkeepers[0].cleanSheets} CS
                       </p>
                     </div>
                   </div>
-                  <div className="text-right">
+                  <div className="text-right shrink-0 ml-2">
                     <span className="font-mono font-black text-2xl text-emerald-400">
                       {topGoalkeepers[0].goalsConceded}
                     </span>
@@ -646,8 +656,79 @@ export default async function HomePage() {
                 </div>
               )}
             </div>
+
+            {/* 3. Best Defender */}
+            <div className="glass-card rounded-2xl p-4 border border-emerald-500/20 flex items-center justify-between">
+              {bestDefenders.length > 0 ? (
+                <>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <SportsAvatar
+                      photo={bestDefenders[0].photo}
+                      name={bestDefenders[0].playerName}
+                      jerseyNumber={bestDefenders[0].jerseyNumber}
+                      size="md"
+                    />
+                    <div className="min-w-0">
+                      <span className="text-[10px] font-black uppercase text-emerald-400 block truncate">
+                        Best Defender
+                      </span>
+                      <h4 className="font-extrabold text-white text-sm truncate">{bestDefenders[0].playerName}</h4>
+                      <p className="text-xs text-slate-400 truncate">{bestDefenders[0].teamName}</p>
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0 ml-2">
+                    <span className="font-mono font-black text-2xl text-emerald-400">
+                      {bestDefenders[0].awardsCount}
+                    </span>
+                    <span className="block text-[10px] font-bold text-slate-400 uppercase">
+                      {bestDefenders[0].awardsCount === 1 ? 'Award' : 'Awards'}
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <div className="w-full text-center py-4 text-xs text-slate-500">
+                  No defender awards yet.
+                </div>
+              )}
+            </div>
+
+            {/* 4. Man of the Match */}
+            <div className="glass-card rounded-2xl p-4 border border-purple-500/20 flex items-center justify-between">
+              {manOfTheMatches.length > 0 ? (
+                <>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <SportsAvatar
+                      photo={manOfTheMatches[0].photo}
+                      name={manOfTheMatches[0].playerName}
+                      jerseyNumber={manOfTheMatches[0].jerseyNumber}
+                      size="md"
+                    />
+                    <div className="min-w-0">
+                      <span className="text-[10px] font-black uppercase text-purple-400 block truncate">
+                        Man of the Match
+                      </span>
+                      <h4 className="font-extrabold text-white text-sm truncate">{manOfTheMatches[0].playerName}</h4>
+                      <p className="text-xs text-slate-400 truncate">{manOfTheMatches[0].teamName}</p>
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0 ml-2">
+                    <span className="font-mono font-black text-2xl text-purple-400">
+                      {manOfTheMatches[0].awardsCount}
+                    </span>
+                    <span className="block text-[10px] font-bold text-slate-400 uppercase">
+                      {manOfTheMatches[0].awardsCount === 1 ? 'MOTM' : 'MOTMs'}
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <div className="w-full text-center py-4 text-xs text-slate-500">
+                  No MOTM awards yet.
+                </div>
+              )}
+            </div>
           </div>
         </section>
+
 
         {/* 7. PARTICIPATING TEAMS */}
         <section className="space-y-4">

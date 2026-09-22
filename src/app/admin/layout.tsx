@@ -9,6 +9,8 @@ import {
   Users,
   UserCheck,
   Calendar,
+  TableProperties,
+  Trophy,
   GitFork,
   Megaphone,
   History,
@@ -24,11 +26,14 @@ const sidebarLinks = [
   { name: 'Teams & Rosters', href: '/admin/teams', icon: Users },
   { name: 'Players Registry', href: '/admin/players', icon: UserCheck },
   { name: 'Matches & Scores', href: '/admin/matches', icon: Calendar },
+  { name: 'League Standings', href: '/admin/standings', icon: TableProperties },
+  { name: 'Tournament Honours', href: '/admin/statistics', icon: Trophy },
   { name: 'Knockout Stages', href: '/admin/knockout', icon: GitFork },
   { name: 'Announcements', href: '/admin/announcements', icon: Megaphone },
   { name: 'Activity Audit Log', href: '/admin/activity', icon: History },
   { name: 'System Settings', href: '/admin/settings', icon: Settings2 },
 ];
+
 
 export default function AdminLayout({
   children,

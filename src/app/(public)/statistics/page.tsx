@@ -12,6 +12,8 @@ import {
 import {
   calculateTopScorers,
   calculateTopGoalkeepers,
+  calculateBestDefenders,
+  calculateManOfTheMatches,
   calculateTeamStats,
 } from '@/lib/engine';
 import { TeamLogo } from '@/components/ui/TeamLogo';
@@ -20,9 +22,11 @@ import { SportsAvatar } from '@/components/ui/SportsAvatar';
 export const revalidate = 0;
 
 export default async function StatisticsPage() {
-  const [topScorers, topGoalkeepers, teamStats] = await Promise.all([
+  const [topScorers, topGoalkeepers, bestDefenders, manOfTheMatches, teamStats] = await Promise.all([
     calculateTopScorers(),
     calculateTopGoalkeepers(),
+    calculateBestDefenders(),
+    calculateManOfTheMatches(),
     calculateTeamStats(),
   ]);
 
@@ -222,20 +226,20 @@ export default async function StatisticsPage() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <div className="p-2.5 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+              <div className="p-2.5 rounded-xl bg-teal-500/20 text-teal-400 border border-teal-500/30">
                 <Shield className="w-5 h-5" />
               </div>
               <div>
                 <h2 className="text-lg font-black uppercase text-white tracking-wide">
                   Top Goalkeepers
                 </h2>
-                <p className="text-xs text-emerald-400 font-semibold">
+                <p className="text-xs text-teal-400 font-semibold">
                   Ranked by Fewest Goals Conceded
                 </p>
               </div>
             </div>
 
-            <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
+            <span className="text-xs font-bold text-teal-400 bg-teal-500/10 px-2.5 py-1 rounded-lg border border-teal-500/20">
               Fewest Conceded
             </span>
           </div>
@@ -254,7 +258,7 @@ export default async function StatisticsPage() {
                       <span
                         className={`w-6 text-center font-mono font-black text-sm ${
                           gk.rank === 1
-                            ? 'text-emerald-400'
+                            ? 'text-teal-400'
                             : gk.rank === 2
                             ? 'text-slate-300'
                             : gk.rank === 3
@@ -304,6 +308,184 @@ export default async function StatisticsPage() {
           </div>
         </div>
       </div>
+
+      {/* 3. BEST DEFENDER & MAN OF THE MATCH LEADERBOARDS */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* BEST DEFENDER */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2.5 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                <Shield className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-lg font-black uppercase text-white tracking-wide">
+                  Best Defender
+                </h2>
+                <p className="text-xs text-slate-400">Defensive Wall Award Ranking</p>
+              </div>
+            </div>
+
+            <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
+              Match Awards
+            </span>
+          </div>
+
+          <div className="glass-card rounded-2xl overflow-hidden shadow-xl border-white/10">
+            {bestDefenders.length === 0 ? (
+              <p className="p-8 text-center text-xs text-slate-400">No Best Defender awards recorded yet.</p>
+            ) : (
+              <div className="divide-y divide-white/5">
+                {bestDefenders.map((def) => (
+                  <div
+                    key={def.playerId}
+                    className="p-4 flex items-center justify-between hover:bg-white/5 transition"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={`w-6 text-center font-mono font-black text-sm ${
+                          def.rank === 1
+                            ? 'text-emerald-400'
+                            : def.rank === 2
+                            ? 'text-slate-300'
+                            : def.rank === 3
+                            ? 'text-amber-500'
+                            : 'text-slate-500'
+                        }`}
+                      >
+                        #{def.rank}
+                      </span>
+
+                      <SportsAvatar
+                        photo={def.photo}
+                        name={def.playerName}
+                        jerseyNumber={def.jerseyNumber}
+                        size="md"
+                      />
+
+                      <div>
+                        <Link
+                          href={`/players/${def.playerId}`}
+                          className="font-black text-white text-sm hover:text-emerald-400 transition"
+                        >
+                          {def.playerName}
+                        </Link>
+                        <p className="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
+                          <span>{def.teamName}</span>
+                          <span>•</span>
+                          <span className="font-mono">#{def.jerseyNumber}</span>
+                          <span>•</span>
+                          <span className="text-[11px] text-slate-500">
+                            {def.matchesPlayed} {def.matchesPlayed === 1 ? 'match' : 'matches'}
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="text-right">
+                      <span className="text-2xl font-black font-mono text-emerald-400">
+                        {def.awardsCount}
+                      </span>
+                      <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                        {def.awardsCount === 1 ? 'Award' : 'Awards'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* MAN OF THE MATCH */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2.5 rounded-xl bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                <Award className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-lg font-black uppercase text-white tracking-wide">
+                  Man of the Match
+                </h2>
+                <p className="text-xs text-purple-400 font-semibold">
+                  Championship Match MVP Ranking
+                </p>
+              </div>
+            </div>
+
+            <span className="text-xs font-bold text-purple-400 bg-purple-500/10 px-2.5 py-1 rounded-lg border border-purple-500/20">
+              MVPs
+            </span>
+          </div>
+
+          <div className="glass-card rounded-2xl overflow-hidden shadow-xl border-white/10">
+            {manOfTheMatches.length === 0 ? (
+              <p className="p-8 text-center text-xs text-slate-400">No MOTM awards recorded yet.</p>
+            ) : (
+              <div className="divide-y divide-white/5">
+                {manOfTheMatches.map((motm) => (
+                  <div
+                    key={motm.playerId}
+                    className="p-4 flex items-center justify-between hover:bg-white/5 transition"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={`w-6 text-center font-mono font-black text-sm ${
+                          motm.rank === 1
+                            ? 'text-purple-400'
+                            : motm.rank === 2
+                            ? 'text-slate-300'
+                            : motm.rank === 3
+                            ? 'text-amber-500'
+                            : 'text-slate-500'
+                        }`}
+                      >
+                        #{motm.rank}
+                      </span>
+
+                      <SportsAvatar
+                        photo={motm.photo}
+                        name={motm.playerName}
+                        jerseyNumber={motm.jerseyNumber}
+                        size="md"
+                      />
+
+                      <div>
+                        <Link
+                          href={`/players/${motm.playerId}`}
+                          className="font-black text-white text-sm hover:text-emerald-400 transition"
+                        >
+                          {motm.playerName}
+                        </Link>
+                        <p className="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
+                          <span>{motm.teamName}</span>
+                          <span>•</span>
+                          <span className="font-mono">#{motm.jerseyNumber}</span>
+                          <span>•</span>
+                          <span className="text-[11px] text-slate-500">
+                            {motm.matchesPlayed} {motm.matchesPlayed === 1 ? 'match' : 'matches'}
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="text-right">
+                      <span className="text-2xl font-black font-mono text-purple-400">
+                        {motm.awardsCount}
+                      </span>
+                      <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                        {motm.awardsCount === 1 ? 'MOTM' : 'MOTMs'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
+
