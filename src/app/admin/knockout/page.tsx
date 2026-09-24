@@ -15,8 +15,14 @@ import {
   Flame,
   ArrowRight,
   Users,
+  Settings,
+  Shield,
+  Lock,
+  Unlock,
+  RefreshCw,
 } from 'lucide-react';
 import { TeamLogo } from '@/components/ui/TeamLogo';
+import { KnockoutBracket, KnockoutMatchData } from '@/components/public/KnockoutBracket';
 
 interface AvailableTeam {
   id: string;
@@ -26,40 +32,9 @@ interface AvailableTeam {
   primaryColor: string;
 }
 
-interface KnockoutMatch {
-  id: string;
-  stage: string;
-  bracketOrder: number;
-  seedLabelA: string | null;
-  seedLabelB: string | null;
-  match: {
-    id: string;
-    matchNumber: number;
-    teamAScore: number;
-    teamBScore: number;
-    time: string;
-    venue: string;
-    status: string;
-    winnerId: string | null;
-    teamA?: {
-      id: string;
-      name: string;
-      shortName: string;
-      logo: string | null;
-      primaryColor: string;
-    } | null;
-    teamB?: {
-      id: string;
-      name: string;
-      shortName: string;
-      logo: string | null;
-      primaryColor: string;
-    } | null;
-  };
-}
-
 export default function AdminKnockoutPage() {
-  const [knockoutMatches, setKnockoutMatches] = useState<KnockoutMatch[]>([]);
+  const [knockoutMatches, setKnockoutMatches] = useState<KnockoutMatchData[]>([]);
+  const [isPreview, setIsPreview] = useState(false);
   const [availableTeams, setAvailableTeams] = useState<AvailableTeam[]>([]);
   const [tournamentStage, setTournamentStage] = useState('LEAGUE');
   const [leagueStatus, setLeagueStatus] = useState<any>(null);
@@ -68,32 +43,46 @@ export default function AdminKnockoutPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
 
-  // Quick Score Modal
-  const [editingKnockout, setEditingKnockout] = useState<KnockoutMatch | null>(null);
-  const [scoreA, setScoreA] = useState(0);
-  const [scoreB, setScoreB] = useState(0);
-  const [matchStatus, setMatchStatus] = useState('COMPLETED');
-  const [savingScore, setSavingScore] = useState(false);
-
   // Edit Teams Modal
-  const [editingTeamsKnockout, setEditingTeamsKnockout] = useState<KnockoutMatch | null>(null);
-  const [selectedTeamAId, setSelectedTeamAId] = useState('');
-  const [selectedTeamBId, setSelectedTeamBId] = useState('');
+  const [editingTeamsMatch, setEditingTeamsMatch] = useState<KnockoutMatchData | null>(null);
+  const [selectedTeamAId, setSelectedTeamAId] = useState<string>('');
+  const [selectedTeamBId, setSelectedTeamBId] = useState<string>('');
   const [savingTeams, setSavingTeams] = useState(false);
   const [teamsError, setTeamsError] = useState<string | null>(null);
 
+  // Quick Score Modal
+  const [editingScoreMatch, setEditingScoreMatch] = useState<KnockoutMatchData | null>(null);
+  const [scoreA, setScoreA] = useState<number>(0);
+  const [scoreB, setScoreB] = useState<number>(0);
+  const [matchStatus, setMatchStatus] = useState<string>('COMPLETED');
+  const [savingScore, setSavingScore] = useState(false);
+  const [scoreError, setScoreError] = useState<string | null>(null);
+
+  // Match Details / Settings Modal
+  const [editingDetailsMatch, setEditingDetailsMatch] = useState<KnockoutMatchData | null>(null);
+  const [detailsTime, setDetailsTime] = useState<string>('');
+  const [detailsVenue, setDetailsVenue] = useState<string>('');
+  const [detailsStatus, setDetailsStatus] = useState<string>('');
+  const [savingDetails, setSavingDetails] = useState(false);
+
   const fetchKnockout = async () => {
     try {
+      setLoading(true);
       const res = await fetch('/api/admin/knockout');
       if (res.ok) {
         const data = await res.json();
-        setKnockoutMatches(data.knockoutMatches || []);
+        const matches = (data.knockoutMatches && data.knockoutMatches.length > 0)
+          ? data.knockoutMatches
+          : (data.previewMatches || []);
+
+        setKnockoutMatches(matches);
+        setIsPreview(Boolean(data.isPreview));
         if (data.tournament) setTournamentStage(data.tournament.currentStage);
         if (data.leagueStatus) setLeagueStatus(data.leagueStatus);
+
         if (data.teams && data.teams.length > 0) {
           setAvailableTeams(data.teams);
         } else {
-          // Fallback fetch teams
           const teamsRes = await fetch('/api/admin/teams');
           if (teamsRes.ok) {
             const teamsData = await teamsRes.json();
@@ -102,29 +91,52 @@ export default function AdminKnockoutPage() {
         }
       }
     } catch (e) {
-      console.error(e);
+      console.error('Error fetching knockout:', e);
+      setActionError('Failed to load knockout bracket data.');
     } finally {
       setLoading(false);
     }
   };
 
-  const openEditTeamsModal = (k: KnockoutMatch) => {
-    setEditingTeamsKnockout(k);
-    setSelectedTeamAId(k.match.teamA?.id || '');
-    setSelectedTeamBId(k.match.teamB?.id || '');
+  useEffect(() => {
+    fetchKnockout();
+  }, []);
+
+  // Open Direct Teams Editor
+  const handleOpenEditTeams = (k: KnockoutMatchData, slot?: 'A' | 'B') => {
+    setEditingTeamsMatch(k);
+    const m = k.match;
+
+    // Team A determination:
+    if (k.seedLabelA === 'NO TEAM') {
+      setSelectedTeamAId('NO_TEAM');
+    } else {
+      setSelectedTeamAId(m.teamA?.id || '');
+    }
+
+    // Team B determination:
+    if (k.seedLabelB === 'NO TEAM') {
+      setSelectedTeamBId('NO_TEAM');
+    } else {
+      setSelectedTeamBId(m.teamB?.id || '');
+    }
+
     setTeamsError(null);
   };
 
+  // Save Direct Teams
   const handleSaveTeams = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingTeamsKnockout) return;
+    if (!editingTeamsMatch) return;
 
-    if (!selectedTeamAId || !selectedTeamBId) {
-      setTeamsError('Please select both Team A and Team B.');
-      return;
-    }
-
-    if (selectedTeamAId === selectedTeamBId) {
+    // Validation: if both are set to the same real team
+    if (
+      selectedTeamAId &&
+      selectedTeamBId &&
+      selectedTeamAId !== 'NO_TEAM' &&
+      selectedTeamBId !== 'NO_TEAM' &&
+      selectedTeamAId === selectedTeamBId
+    ) {
       setTeamsError('A team cannot play against itself. Please select two distinct teams.');
       return;
     }
@@ -139,9 +151,9 @@ export default function AdminKnockoutPage() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          knockoutMatchId: editingTeamsKnockout.id,
-          teamAId: selectedTeamAId,
-          teamBId: selectedTeamBId,
+          knockoutMatchId: editingTeamsMatch.id,
+          teamAId: selectedTeamAId || null,
+          teamBId: selectedTeamBId || null,
         }),
       });
 
@@ -149,13 +161,20 @@ export default function AdminKnockoutPage() {
       if (!res.ok) {
         setTeamsError(data.error || 'Failed to update teams.');
       } else {
-        const teamAName = availableTeams.find((t) => t.id === selectedTeamAId)?.name || 'Team A';
-        const teamBName = availableTeams.find((t) => t.id === selectedTeamBId)?.name || 'Team B';
+        const teamAName =
+          selectedTeamAId === 'NO_TEAM'
+            ? 'NO TEAM'
+            : availableTeams.find((t) => t.id === selectedTeamAId)?.name || 'Team A';
+        const teamBName =
+          selectedTeamBId === 'NO_TEAM'
+            ? 'NO TEAM'
+            : availableTeams.find((t) => t.id === selectedTeamBId)?.name || 'Team B';
+
         setActionSuccess(
-          `Match #${editingTeamsKnockout.match.matchNumber} teams updated: ${teamAName} vs ${teamBName}!`
+          `Match #${editingTeamsMatch.match.matchNumber} (${editingTeamsMatch.stage.replace('_', ' ')}) updated: ${teamAName} vs ${teamBName}! Bracket recalculated.`
         );
-        setEditingTeamsKnockout(null);
-        fetchKnockout();
+        setEditingTeamsMatch(null);
+        await fetchKnockout();
       }
     } catch (err) {
       setTeamsError('An error occurred while saving teams.');
@@ -164,10 +183,102 @@ export default function AdminKnockoutPage() {
     }
   };
 
-  useEffect(() => {
-    fetchKnockout();
-  }, []);
+  // Open Direct Score Editor
+  const handleOpenEditScore = (k: KnockoutMatchData) => {
+    setEditingScoreMatch(k);
+    setScoreA(k.match.teamAScore ?? 0);
+    setScoreB(k.match.teamBScore ?? 0);
+    setMatchStatus(k.match.status || 'COMPLETED');
+    setScoreError(null);
+  };
 
+  // Save Direct Score
+  const handleSaveScore = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingScoreMatch) return;
+
+    setSavingScore(true);
+    setScoreError(null);
+    setActionSuccess(null);
+    setActionError(null);
+
+    try {
+      const res = await fetch('/api/admin/knockout', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          knockoutMatchId: editingScoreMatch.id,
+          teamAScore: Number(scoreA),
+          teamBScore: Number(scoreB),
+          status: matchStatus,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setScoreError(data.error || 'Failed to record score.');
+      } else {
+        setActionSuccess(
+          `Match #${editingScoreMatch.match.matchNumber} score saved (${scoreA} - ${scoreB})! Downstream progression recalculated.`
+        );
+        setEditingScoreMatch(null);
+        await fetchKnockout();
+      }
+    } catch (err) {
+      setScoreError('An error occurred while recording score.');
+    } finally {
+      setSavingScore(false);
+    }
+  };
+
+  // Open Match Settings
+  const handleOpenEditMatch = (k: KnockoutMatchData) => {
+    setEditingDetailsMatch(k);
+    setDetailsTime(k.match.time || '18:00');
+    setDetailsVenue(k.match.venue || 'Pitch 1 - Main Turf Arena');
+    setDetailsStatus(k.match.status || 'UPCOMING');
+  };
+
+  // Save Match Settings
+  const handleSaveDetails = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingDetailsMatch) return;
+
+    setSavingDetails(true);
+    try {
+      // If it's a real DB match, update via /api/admin/matches
+      if (!editingDetailsMatch.id.startsWith('preview-')) {
+        await fetch('/api/admin/matches', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: editingDetailsMatch.match.id,
+            time: detailsTime,
+            venue: detailsVenue,
+            status: detailsStatus,
+          }),
+        });
+      } else {
+        await fetch('/api/admin/knockout', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            knockoutMatchId: editingDetailsMatch.id,
+            status: detailsStatus,
+          }),
+        });
+      }
+      setActionSuccess(`Match #${editingDetailsMatch.match.matchNumber} details updated!`);
+      setEditingDetailsMatch(null);
+      await fetchKnockout();
+    } catch (err) {
+      setActionError('Failed to update match details.');
+    } finally {
+      setSavingDetails(false);
+    }
+  };
+
+  // Trigger Seeding (When league is complete)
   const handleGenerateBracket = async () => {
     setGenerating(true);
     setActionSuccess(null);
@@ -183,361 +294,183 @@ export default function AdminKnockoutPage() {
       if (!res.ok) {
         setActionError(data.error || 'Failed to generate bracket.');
       } else {
-        setActionSuccess('Knockout stages generated successfully from current league standings.');
-        fetchKnockout();
+        setActionSuccess('Knockout bracket successfully seeded from official league standings!');
+        await fetchKnockout();
       }
     } catch (e) {
-      setActionError('An error occurred.');
+      setActionError('An error occurred during bracket seeding.');
     } finally {
       setGenerating(false);
     }
   };
 
-  const openScoreModal = (k: KnockoutMatch) => {
-    setEditingKnockout(k);
-    setScoreA(k.match.teamAScore);
-    setScoreB(k.match.teamBScore);
-    setMatchStatus(k.match.status);
-  };
-
-  const handleSaveScore = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingKnockout) return;
-
-    setSavingScore(true);
-    setActionSuccess(null);
-    setActionError(null);
-
-    try {
-      const res = await fetch('/api/admin/matches', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: editingKnockout.match.id,
-          teamAScore: Number(scoreA),
-          teamBScore: Number(scoreB),
-          status: matchStatus,
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        setActionError(data.error || 'Failed to update score.');
-      } else {
-        setActionSuccess(
-          `Match #${editingKnockout.match.matchNumber} score recorded! Bracket automatically advanced.`
-        );
-        setEditingKnockout(null);
-        fetchKnockout();
-      }
-    } catch (err) {
-      setActionError('Failed to save match score.');
-    } finally {
-      setSavingScore(false);
-    }
-  };
+  const isLeagueIncomplete = leagueStatus && !leagueStatus.isComplete;
 
   return (
-    <div className="space-y-8 max-w-6xl mx-auto pb-16">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/15 pb-6">
+    <div className="space-y-6 max-w-7xl mx-auto pb-16">
+      {/* 1. CONTROL CENTER HEADER */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/15 pb-6">
         <div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/25 border border-emerald-400/50 text-emerald-200 text-xs font-black uppercase tracking-wider mb-2 shadow-sm shadow-emerald-950/40">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-xs font-black uppercase tracking-wider mb-2">
             <GitFork className="w-3.5 h-3.5 text-amber-400" />
-            Playoff Bracket Architecture
+            KNOCKOUT CONTROL CENTER
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-white uppercase tracking-tight drop-shadow-sm">
-            Knockout Stages Management
+          <h1 className="text-2xl sm:text-3xl font-black text-white uppercase tracking-tight">
+            Playoff Bracket Architecture
           </h1>
-          <p className="text-xs sm:text-sm text-slate-200 font-medium mt-1">
-            Current Stage: <strong className="text-emerald-300 font-black uppercase">{tournamentStage}</strong>
-            {leagueStatus && ` • League Completion: ${leagueStatus.completedMatches} / ${leagueStatus.scheduledMatches} (${leagueStatus.percentComplete}%)`}
+          <p className="text-xs sm:text-sm text-slate-300 font-medium mt-1">
+            Tournament Status:{' '}
+            <strong className="text-emerald-300 font-bold uppercase">{tournamentStage}</strong>
+            {leagueStatus && (
+              <span>
+                {' '}
+                • League Progress:{' '}
+                <strong className="text-amber-300 font-mono">
+                  {leagueStatus.completedMatches} / {leagueStatus.expectedMatches || 15} Matches ({leagueStatus.percentComplete}%)
+                </strong>
+              </span>
+            )}
           </p>
         </div>
 
-        <button
-          onClick={handleGenerateBracket}
-          disabled={generating || (leagueStatus && !leagueStatus.isComplete)}
-          className={`px-4 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider shadow-lg flex items-center justify-center gap-2 transition ${
-            leagueStatus && !leagueStatus.isComplete
-              ? 'bg-slate-800/90 text-slate-300 border-2 border-white/20 cursor-not-allowed opacity-75'
-              : 'bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-500 hover:from-emerald-400 hover:via-teal-300 hover:to-emerald-400 text-white shadow-emerald-500/40 border-2 border-emerald-300/80 hover:border-emerald-200'
-          }`}
-          title={
-            leagueStatus && !leagueStatus.isComplete
-              ? 'All league matches must be completed first'
-              : 'Generate or update knockout fixtures'
-          }
-        >
-          {leagueStatus && !leagueStatus.isComplete ? (
-            <span>🔒 Knockout Locked (League Incomplete)</span>
-          ) : (
-            <>
-              <RotateCcw className={`w-4 h-4 text-white ${generating ? 'animate-spin' : ''}`} />
-              <span>{generating ? 'Seeding Bracket...' : '🏆 Seed / Re-seed Knockouts'}</span>
-            </>
-          )}
-        </button>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            type="button"
+            onClick={fetchKnockout}
+            disabled={loading}
+            className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-white/15 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition"
+            title="Refresh bracket data"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-emerald-400 ${loading ? 'animate-spin' : ''}`} />
+            <span>Refresh</span>
+          </button>
+
+          <button
+            onClick={handleGenerateBracket}
+            disabled={generating || isLeagueIncomplete}
+            className={`px-4 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider shadow-lg flex items-center justify-center gap-2 transition ${
+              isLeagueIncomplete
+                ? 'bg-slate-800/80 text-slate-400 border border-white/10 cursor-not-allowed'
+                : 'bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-500 hover:from-emerald-400 hover:via-teal-300 text-white shadow-emerald-500/40 border border-emerald-300/80'
+            }`}
+            title={
+              isLeagueIncomplete
+                ? 'Knockout automatically unlocks after all league matches are completed'
+                : 'Generate official knockout fixtures'
+            }
+          >
+            {isLeagueIncomplete ? (
+              <>
+                <Lock className="w-3.5 h-3.5 text-amber-400" />
+                <span>Knockout Locked (League Incomplete)</span>
+              </>
+            ) : (
+              <>
+                <RotateCcw className={`w-4 h-4 text-white ${generating ? 'animate-spin' : ''}`} />
+                <span>{generating ? 'Seeding Bracket...' : '🏆 Seed Official Knockouts'}</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
+      {/* 2. ALERTS */}
       {actionSuccess && (
-        <div className="p-4 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-xs text-emerald-300 flex items-center gap-2">
+        <div className="p-4 rounded-xl bg-emerald-950/70 border border-emerald-500/50 text-xs text-emerald-300 flex items-center gap-2.5 shadow-lg">
           <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-          <span>{actionSuccess}</span>
+          <span className="font-semibold">{actionSuccess}</span>
         </div>
       )}
 
       {actionError && (
-        <div className="p-4 rounded-xl bg-rose-950/60 border border-rose-500/40 text-xs text-rose-300 flex items-center gap-2">
+        <div className="p-4 rounded-xl bg-rose-950/70 border border-rose-500/50 text-xs text-rose-300 flex items-center gap-2.5 shadow-lg">
           <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
-          <span>{actionError}</span>
+          <span className="font-semibold">{actionError}</span>
         </div>
       )}
 
-      {/* Knockout Match Cards */}
-      {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-48 rounded-2xl bg-slate-900/40 animate-pulse border border-white/5" />
-          ))}
-        </div>
-      ) : knockoutMatches.length === 0 ? (
-        <div className="glass-card rounded-2xl p-12 text-center text-slate-400 max-w-xl mx-auto space-y-3">
-          <Trophy className="w-12 h-12 text-slate-600 mx-auto mb-2" />
-          <h3 className="text-base font-bold text-white uppercase">Knockout Brackets Not Generated</h3>
-          <p className="text-xs text-slate-400">
-            Click &ldquo;Seed / Re-seed Knockouts&rdquo; to automatically populate fixtures from current league standings, or advance via the Dashboard once the league stage is complete.
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {knockoutMatches.map((k) => {
-            const m = k.match;
-            const isCompleted = m.status === 'COMPLETED';
-
-            return (
-              <div
-                key={k.id}
-                className="glass-card rounded-2xl p-5 border border-white/10 space-y-4 flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center justify-between border-b border-white/5 pb-2 text-xs">
-                    <span className="font-mono font-bold text-amber-400">
-                      {k.stage.replace('_', ' ')} • Match #{m.matchNumber}
-                    </span>
-                    <span
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                        isCompleted
-                          ? 'bg-emerald-500/20 text-emerald-400'
-                          : m.status === 'LIVE'
-                          ? 'bg-rose-500/20 text-rose-400'
-                          : 'bg-slate-800 text-slate-400'
-                      }`}
-                    >
-                      {m.status}
-                    </span>
-                  </div>
-
-                  <div className="space-y-3 my-3">
-                    {/* Team A */}
-                    <div className="flex items-center justify-between p-2 rounded-xl bg-slate-950/40">
-                      <div className="flex items-center gap-2.5">
-                        {m.teamA ? (
-                          <TeamLogo
-                            name={m.teamA.name}
-                            shortName={m.teamA.shortName}
-                            logo={m.teamA.logo}
-                            primaryColor={m.teamA.primaryColor}
-                            size="sm"
-                          />
-                        ) : (
-                          <div className="w-7 h-7 rounded-lg bg-slate-800 flex items-center justify-center text-xs text-slate-500">
-                            ?
-                          </div>
-                        )}
-                        <div>
-                          <span className="font-bold text-white text-xs block">
-                            {m.teamA?.name || k.seedLabelA || 'TBD'}
-                          </span>
-                          <span className="text-[10px] text-slate-500 font-mono">
-                            {k.seedLabelA || 'Qualifier'}
-                          </span>
-                        </div>
-                      </div>
-                      <span className="font-mono font-black text-xl text-white">
-                        {isCompleted ? m.teamAScore : '—'}
-                      </span>
-                    </div>
-
-                    {/* Team B */}
-                    <div className="flex items-center justify-between p-2 rounded-xl bg-slate-950/40">
-                      <div className="flex items-center gap-2.5">
-                        {m.teamB ? (
-                          <TeamLogo
-                            name={m.teamB.name}
-                            shortName={m.teamB.shortName}
-                            logo={m.teamB.logo}
-                            primaryColor={m.teamB.primaryColor}
-                            size="sm"
-                          />
-                        ) : (
-                          <div className="w-7 h-7 rounded-lg bg-slate-800 flex items-center justify-center text-xs text-slate-500">
-                            ?
-                          </div>
-                        )}
-                        <div>
-                          <span className="font-bold text-white text-xs block">
-                            {m.teamB?.name || k.seedLabelB || 'TBD'}
-                          </span>
-                          <span className="text-[10px] text-slate-500 font-mono">
-                            {k.seedLabelB || 'Qualifier'}
-                          </span>
-                        </div>
-                      </div>
-                      <span className="font-mono font-black text-xl text-white">
-                        {isCompleted ? m.teamBScore : '—'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-3 border-t border-white/5 flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-[11px] text-slate-400">{m.time}</span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => openEditTeamsModal(k)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 text-slate-300 hover:text-white hover:bg-slate-800 border border-white/10 hover:border-white/20 text-xs font-bold uppercase tracking-wider transition"
-                      title="Edit teams for this match"
-                    >
-                      <Users className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Edit Teams</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => openScoreModal(k)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600/30 text-emerald-300 hover:bg-emerald-600/40 border border-emerald-500/40 text-xs font-bold uppercase tracking-wider transition"
-                    >
-                      <Edit2 className="w-3.5 h-3.5" />
-                      <span>Enter Score</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* QUICK SCORE MODAL */}
-      {editingKnockout && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-slate-950 border border-white/10 rounded-3xl p-6 shadow-2xl space-y-5">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <div>
-                <h3 className="font-black text-white uppercase text-base">
-                  Record Score — Match #{editingKnockout.match.matchNumber}
-                </h3>
-                <span className="text-xs text-emerald-400 font-mono">
-                  {editingKnockout.stage.replace('_', ' ')}
-                </span>
-              </div>
-              <button
-                onClick={() => setEditingKnockout(null)}
-                className="p-1 rounded-lg text-slate-400 hover:text-white"
-              >
-                <X className="w-5 h-5" />
-              </button>
+      {/* 3. KNOCKOUT LOCK STATE BANNER (CLEAR, INFORMATIVE, BRIGHT - NOT DARK/OBSCURED) */}
+      {isLeagueIncomplete ? (
+        <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-950/40 via-slate-900 to-amber-950/40 border border-amber-500/40 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-amber-300 shrink-0">
+              <Lock className="w-4 h-4" />
             </div>
-
-            <form onSubmit={handleSaveScore} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-3.5 rounded-2xl bg-slate-900 border border-white/5 space-y-2">
-                  <label className="block text-xs font-bold uppercase text-slate-300 truncate">
-                    {editingKnockout.match.teamA?.name || 'Team A'}
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    required
-                    value={scoreA}
-                    onChange={(e) => setScoreA(Number(e.target.value))}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/10 text-white font-mono font-black text-2xl text-center focus:border-emerald-500 focus:outline-none"
-                  />
-                </div>
-
-                <div className="p-3.5 rounded-2xl bg-slate-900 border border-white/5 space-y-2">
-                  <label className="block text-xs font-bold uppercase text-slate-300 truncate">
-                    {editingKnockout.match.teamB?.name || 'Team B'}
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    required
-                    value={scoreB}
-                    onChange={(e) => setScoreB(Number(e.target.value))}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/10 text-white font-mono font-black text-2xl text-center focus:border-emerald-500 focus:outline-none"
-                  />
-                </div>
+            <div>
+              <div className="font-black text-amber-300 uppercase tracking-wide text-xs sm:text-sm">
+                PROJECTED PLAYOFF BRACKET (KNOCKOUT CURRENTLY LOCKED)
               </div>
-
-              <div>
-                <label className="block text-xs font-bold uppercase text-slate-300 mb-1">
-                  Match Status
-                </label>
-                <select
-                  value={matchStatus}
-                  onChange={(e) => setMatchStatus(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-white/10 text-white text-xs focus:border-emerald-500 focus:outline-none"
-                >
-                  <option value="COMPLETED">COMPLETED (Advances Winner)</option>
-                  <option value="LIVE">LIVE</option>
-                  <option value="UPCOMING">UPCOMING</option>
-                </select>
-              </div>
-
-              <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-[11px] text-emerald-300">
-                Saving score marks the winner and automatically updates the next bracket round (e.g. Semi-Finals → Grand Final).
-              </div>
-
-              <div className="flex items-center gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setEditingKnockout(null)}
-                  className="flex-1 py-2.5 px-4 rounded-xl bg-slate-900 text-slate-300 font-bold text-xs uppercase tracking-wider hover:bg-slate-800 transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={savingScore}
-                  className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 text-white font-black text-xs uppercase tracking-wider hover:from-emerald-500 hover:to-emerald-400 transition shadow-lg shadow-emerald-900/40"
-                >
-                  {savingScore ? 'Saving...' : 'Save & Advance'}
-                </button>
-              </div>
-            </form>
+              <p className="text-slate-300 text-[11px] mt-0.5 leading-relaxed">
+                Knockout officially unlocks after all league matches are completed ({leagueStatus?.completedMatches || 0}/{leagueStatus?.expectedMatches || 15} finished).
+                The bracket below shows projected positions from current standings. You can directly edit teams (including &ldquo;NO TEAM&rdquo;), scores, and match settings.
+              </p>
+            </div>
+          </div>
+          <div className="shrink-0 flex items-center gap-2 font-mono font-bold text-amber-400 bg-amber-500/15 px-3 py-1.5 rounded-xl border border-amber-500/30">
+            <span>🔒 Locked: {leagueStatus?.completedMatches || 0}/{leagueStatus?.expectedMatches || 15} Played</span>
           </div>
         </div>
+      ) : (
+        <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/40 via-slate-900 to-emerald-950/40 border border-emerald-500/40 shadow-lg flex items-center justify-between text-xs text-emerald-300">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-300 shrink-0">
+              <Unlock className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="font-black uppercase tracking-wide text-xs sm:text-sm">
+                OFFICIAL KNOCKOUT BRACKET UNLOCKED
+              </span>
+              <p className="text-slate-300 text-[11px] mt-0.5">
+                All league fixtures are completed. Changes to teams, scores, and progression update live across all public tournament pages.
+              </p>
+            </div>
+          </div>
+          <span className="font-mono font-bold text-emerald-400 bg-emerald-500/15 px-3 py-1.5 rounded-xl border border-emerald-500/30">
+            🟢 League Complete
+          </span>
+        </div>
       )}
 
-      {/* EDIT TEAMS MODAL */}
-      {editingTeamsKnockout && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="w-full max-w-lg bg-slate-950 border border-white/10 rounded-3xl p-6 shadow-2xl space-y-5">
+      {/* 4. THE BRACKET (BRIGHT, FULLY INTERACTIVE, MAIN INTERFACE) */}
+      <div className="bg-slate-950/60 p-4 sm:p-6 rounded-3xl border border-white/10 shadow-2xl">
+        <div className="mb-4 flex items-center justify-between border-b border-white/10 pb-3">
+          <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-white">
+            <Trophy className="w-4 h-4 text-amber-400" />
+            <span>Championship Playoff Structure (Qualifier 1 ➔ Eliminator ➔ Qualifier 2 ➔ Final)</span>
+          </div>
+          <span className="text-[11px] text-slate-400 font-mono hidden sm:inline">
+            Direct Edit Controls Active
+          </span>
+        </div>
+
+        <KnockoutBracket
+          knockoutMatches={knockoutMatches}
+          currentStage={tournamentStage}
+          isPreview={isPreview}
+          isAdmin={true}
+          onEditTeams={handleOpenEditTeams}
+          onEditScore={handleOpenEditScore}
+          onEditMatch={handleOpenEditMatch}
+        />
+      </div>
+
+      {/* 5. DIRECT TEAM EDITING MODAL (Supports ALL teams + "NO TEAM") */}
+      {editingTeamsMatch && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="w-full max-w-lg bg-slate-950 border border-white/15 rounded-3xl p-6 shadow-2xl space-y-5">
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <div>
                 <h3 className="font-black text-white uppercase text-base flex items-center gap-2">
                   <Users className="w-4 h-4 text-amber-400" />
-                  <span>Edit Teams — Match #{editingTeamsKnockout.match.matchNumber}</span>
+                  <span>Edit Teams — Match #{editingTeamsMatch.match.matchNumber}</span>
                 </h3>
                 <span className="text-xs text-emerald-400 font-mono">
-                  {editingTeamsKnockout.stage.replace('_', ' ')}
+                  {editingTeamsMatch.stage.replace('_', ' ')}
                 </span>
               </div>
               <button
                 type="button"
-                onClick={() => setEditingTeamsKnockout(null)}
+                onClick={() => setEditingTeamsMatch(null)}
                 className="p-1 rounded-lg text-slate-400 hover:text-white transition"
               >
                 <X className="w-5 h-5" />
@@ -554,74 +487,263 @@ export default function AdminKnockoutPage() {
             <form onSubmit={handleSaveTeams} className="space-y-4">
               <div className="space-y-3">
                 {/* Team A Selection */}
-                <div className="p-3.5 rounded-2xl bg-slate-900 border border-white/5 space-y-2">
+                <div className="p-3.5 rounded-2xl bg-slate-900 border border-white/10 space-y-2">
                   <label className="block text-xs font-black uppercase text-amber-400 tracking-wider">
-                    Team A (First Team)
+                    Team A Slot
                   </label>
                   <select
                     value={selectedTeamAId}
                     onChange={(e) => setSelectedTeamAId(e.target.value)}
-                    required
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-white/10 text-white text-xs font-semibold focus:border-emerald-500 focus:outline-none transition"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-white/15 text-white text-xs font-semibold focus:border-emerald-500 focus:outline-none transition"
                   >
                     <option value="" disabled>
                       -- Select Team A --
                     </option>
-                    {availableTeams.map((team) => (
-                      <option key={team.id} value={team.id}>
-                        {team.name} ({team.shortName})
-                      </option>
-                    ))}
+                    <option value="NO_TEAM" className="text-amber-400 font-bold">
+                      🚫 NO TEAM (Black / Empty Placeholder Slot)
+                    </option>
+                    <optgroup label="Tournament Teams">
+                      {availableTeams.map((team) => (
+                        <option key={team.id} value={team.id}>
+                          {team.name} ({team.shortName})
+                        </option>
+                      ))}
+                    </optgroup>
                   </select>
                 </div>
 
                 {/* Team B Selection */}
-                <div className="p-3.5 rounded-2xl bg-slate-900 border border-white/5 space-y-2">
+                <div className="p-3.5 rounded-2xl bg-slate-900 border border-white/10 space-y-2">
                   <label className="block text-xs font-black uppercase text-teal-400 tracking-wider">
-                    Team B (Second Team)
+                    Team B Slot
                   </label>
                   <select
                     value={selectedTeamBId}
                     onChange={(e) => setSelectedTeamBId(e.target.value)}
-                    required
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-white/10 text-white text-xs font-semibold focus:border-emerald-500 focus:outline-none transition"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-white/15 text-white text-xs font-semibold focus:border-emerald-500 focus:outline-none transition"
                   >
                     <option value="" disabled>
                       -- Select Team B --
                     </option>
-                    {availableTeams.map((team) => (
-                      <option key={team.id} value={team.id}>
-                        {team.name} ({team.shortName})
-                      </option>
-                    ))}
+                    <option value="NO_TEAM" className="text-amber-400 font-bold">
+                      🚫 NO TEAM (Black / Empty Placeholder Slot)
+                    </option>
+                    <optgroup label="Tournament Teams">
+                      {availableTeams.map((team) => (
+                        <option key={team.id} value={team.id}>
+                          {team.name} ({team.shortName})
+                        </option>
+                      ))}
+                    </optgroup>
                   </select>
                 </div>
               </div>
 
-              {selectedTeamAId && selectedTeamBId && selectedTeamAId === selectedTeamBId && (
-                <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-500/30 text-[11px] text-rose-300">
-                  ⚠️ A team cannot play against itself. Please select two different teams.
-                </div>
-              )}
-
-              <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-[11px] text-emerald-300">
-                💡 Changing either team will immediately update the fixture lineup in both the admin management panel and the public tournament knockout bracket.
+              <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-[11px] text-emerald-300 leading-relaxed">
+                💡 <strong>Manual Seed Protection:</strong> Editing teams directly tags the match with manual assignment protection so automatic seed recalculations will not overwrite your chosen teams.
               </div>
 
               <div className="flex items-center gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setEditingTeamsKnockout(null)}
+                  onClick={() => setEditingTeamsMatch(null)}
                   className="flex-1 py-2.5 px-4 rounded-xl bg-slate-900 text-slate-300 font-bold text-xs uppercase tracking-wider hover:bg-slate-800 transition border border-white/10"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={savingTeams || !selectedTeamAId || !selectedTeamBId || selectedTeamAId === selectedTeamBId}
-                  className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-black text-xs uppercase tracking-wider transition shadow-lg shadow-emerald-900/40 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={savingTeams}
+                  className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-black text-xs uppercase tracking-wider transition shadow-lg shadow-emerald-900/40 disabled:opacity-50"
                 >
                   {savingTeams ? 'Saving Teams...' : 'Save Teams'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 6. DIRECT SCORE EDITING MODAL */}
+      {editingScoreMatch && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="w-full max-w-md bg-slate-950 border border-white/15 rounded-3xl p-6 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div>
+                <h3 className="font-black text-white uppercase text-base flex items-center gap-2">
+                  <Edit2 className="w-4 h-4 text-emerald-400" />
+                  <span>Record Score — Match #{editingScoreMatch.match.matchNumber}</span>
+                </h3>
+                <span className="text-xs text-emerald-400 font-mono">
+                  {editingScoreMatch.stage.replace('_', ' ')}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingScoreMatch(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {scoreError && (
+              <div className="p-3.5 rounded-xl bg-rose-950/70 border border-rose-500/40 text-xs text-rose-300 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                <span>{scoreError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveScore} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-3.5 rounded-2xl bg-slate-900 border border-white/10 space-y-2">
+                  <label className="block text-xs font-bold uppercase text-slate-300 truncate">
+                    {editingScoreMatch.match.teamA?.name || editingScoreMatch.seedLabelA || 'Team A'}
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    value={scoreA}
+                    onChange={(e) => setScoreA(Number(e.target.value))}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/15 text-white font-mono font-black text-2xl text-center focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-slate-900 border border-white/10 space-y-2">
+                  <label className="block text-xs font-bold uppercase text-slate-300 truncate">
+                    {editingScoreMatch.match.teamB?.name || editingScoreMatch.seedLabelB || 'Team B'}
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    value={scoreB}
+                    onChange={(e) => setScoreB(Number(e.target.value))}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/15 text-white font-mono font-black text-2xl text-center focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-300 mb-1">
+                  Match Status
+                </label>
+                <select
+                  value={matchStatus}
+                  onChange={(e) => setMatchStatus(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-white/15 text-white text-xs focus:border-emerald-500 focus:outline-none"
+                >
+                  <option value="COMPLETED">COMPLETED (Advances Winner/Loser Downstream)</option>
+                  <option value="LIVE">LIVE</option>
+                  <option value="UPCOMING">UPCOMING</option>
+                </select>
+              </div>
+
+              <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-[11px] text-emerald-300 leading-relaxed">
+                Saving score marks the match result and immediately calculates the winner/loser progression to the next knockout round.
+              </div>
+
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingScoreMatch(null)}
+                  className="flex-1 py-2.5 px-4 rounded-xl bg-slate-900 text-slate-300 font-bold text-xs uppercase tracking-wider hover:bg-slate-800 transition border border-white/10"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingScore}
+                  className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-black text-xs uppercase tracking-wider transition shadow-lg shadow-emerald-900/40"
+                >
+                  {savingScore ? 'Saving Score...' : 'Save & Advance'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 7. FULL MATCH DETAILS MODAL */}
+      {editingDetailsMatch && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="w-full max-w-md bg-slate-950 border border-white/15 rounded-3xl p-6 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div>
+                <h3 className="font-black text-white uppercase text-base flex items-center gap-2">
+                  <Settings className="w-4 h-4 text-emerald-400" />
+                  <span>Match #{editingDetailsMatch.match.matchNumber} Details</span>
+                </h3>
+                <span className="text-xs text-emerald-400 font-mono">
+                  {editingDetailsMatch.stage.replace('_', ' ')}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingDetailsMatch(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveDetails} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-300 mb-1">
+                  Scheduled Time
+                </label>
+                <input
+                  type="text"
+                  value={detailsTime}
+                  onChange={(e) => setDetailsTime(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-white/15 text-white text-xs font-mono focus:border-emerald-500 focus:outline-none"
+                  placeholder="e.g. 06:00 PM"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-300 mb-1">
+                  Venue / Pitch
+                </label>
+                <input
+                  type="text"
+                  value={detailsVenue}
+                  onChange={(e) => setDetailsVenue(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-white/15 text-white text-xs focus:border-emerald-500 focus:outline-none"
+                  placeholder="e.g. Pitch 1 - Main Turf Arena"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-300 mb-1">
+                  Status
+                </label>
+                <select
+                  value={detailsStatus}
+                  onChange={(e) => setDetailsStatus(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-white/15 text-white text-xs focus:border-emerald-500 focus:outline-none"
+                >
+                  <option value="UPCOMING">UPCOMING</option>
+                  <option value="LIVE">LIVE</option>
+                  <option value="COMPLETED">COMPLETED</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingDetailsMatch(null)}
+                  className="flex-1 py-2.5 px-4 rounded-xl bg-slate-900 text-slate-300 font-bold text-xs uppercase tracking-wider hover:bg-slate-800 transition border border-white/10"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingDetails}
+                  className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-black text-xs uppercase tracking-wider transition shadow-lg shadow-emerald-900/40"
+                >
+                  {savingDetails ? 'Saving...' : 'Save Settings'}
                 </button>
               </div>
             </form>

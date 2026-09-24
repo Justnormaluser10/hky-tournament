@@ -120,8 +120,9 @@ export default function MatchesPage() {
   const roundTabs = [
     { label: 'All Stages', value: 'ALL' },
     { label: 'League', value: 'LEAGUE' },
-    { label: 'Quarter Finals', value: 'QUARTER_FINAL' },
-    { label: 'Semi Finals', value: 'SEMI_FINAL' },
+    { label: 'Qualifier 1', value: 'QUALIFIER_1' },
+    { label: 'Eliminator', value: 'ELIMINATOR' },
+    { label: 'Qualifier 2', value: 'QUALIFIER_2' },
     { label: 'Final', value: 'FINAL' },
   ];
 

@@ -33,6 +33,7 @@ interface Team {
   primaryColor: string;
   logo: string | null;
   captainId: string | null;
+  qualificationStatus?: string | null;
   players: Player[];
   _count?: {
     players: number;
@@ -59,6 +60,7 @@ export default function AdminTeamsPage() {
   const [description, setDescription] = useState('');
   const [primaryColor, setPrimaryColor] = useState('#059669');
   const [logo, setLogo] = useState('');
+  const [qualificationStatus, setQualificationStatus] = useState<string>('');
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -129,6 +131,7 @@ export default function AdminTeamsPage() {
     setDescription('');
     setPrimaryColor('#059669');
     setLogo('');
+    setQualificationStatus('');
     setUploadError(null);
     setIsAddOpen(true);
   };
@@ -141,6 +144,7 @@ export default function AdminTeamsPage() {
     setDescription(t.description || '');
     setPrimaryColor(t.primaryColor || '#059669');
     setLogo(t.logo || '');
+    setQualificationStatus(t.qualificationStatus || '');
     setUploadError(null);
   };
 
@@ -196,6 +200,7 @@ export default function AdminTeamsPage() {
           description,
           primaryColor,
           logo: logo.trim() || null,
+          qualificationStatus: qualificationStatus || null,
         }),
       });
 
@@ -346,10 +351,22 @@ export default function AdminTeamsPage() {
                       />
                       <div>
                         <h3 className="text-lg font-black text-white">{t.name}</h3>
-                        <span className="text-xs font-mono text-amber-400 font-bold block">
-                          [{t.shortName}]
-                        </span>
-                        <p className="text-xs text-slate-400 mt-0.5">
+                        <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                          <span className="text-xs font-mono text-amber-400 font-bold">
+                            [{t.shortName}]
+                          </span>
+                          {t.qualificationStatus === 'Q' && (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-black bg-emerald-500/25 text-emerald-300 border border-emerald-500/50">
+                              QUALIFIED (Q)
+                            </span>
+                          )}
+                          {t.qualificationStatus === 'E' && (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-black bg-rose-500/25 text-rose-300 border border-rose-500/50">
+                              ELIMINATED (E)
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-400 mt-1">
                           Coach: <strong className="text-slate-200">{t.coach || 'None'}</strong>
                         </p>
                       </div>
@@ -664,6 +681,22 @@ export default function AdminTeamsPage() {
                   onChange={(e) => setDescription(e.target.value)}
                   className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-white/10 text-white text-xs focus:border-emerald-500 focus:outline-none"
                 />
+              </div>
+
+              {/* Playoff Qualification Status */}
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-300 mb-1">
+                  Playoff Qualification Status
+                </label>
+                <select
+                  value={qualificationStatus}
+                  onChange={(e) => setQualificationStatus(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-white/10 text-white text-xs focus:border-emerald-500 focus:outline-none"
+                >
+                  <option value="">None (Regular League Team)</option>
+                  <option value="Q">Q — Qualified for Knockouts</option>
+                  <option value="E">E — Eliminated from Tournament</option>
+                </select>
               </div>
 
               {/* Team Logo Upload */}

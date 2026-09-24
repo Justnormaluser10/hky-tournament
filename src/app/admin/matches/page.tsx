@@ -1399,8 +1399,9 @@ export default function AdminMatchesPage() {
                     className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/10 text-white text-xs focus:outline-none"
                   >
                     <option value="LEAGUE">LEAGUE</option>
-                    <option value="QUARTER_FINAL">QUARTER_FINAL</option>
-                    <option value="SEMI_FINAL">SEMI_FINAL</option>
+                    <option value="QUALIFIER_1">QUALIFIER_1</option>
+                    <option value="ELIMINATOR">ELIMINATOR</option>
+                    <option value="QUALIFIER_2">QUALIFIER_2</option>
                     <option value="FINAL">FINAL</option>
                   </select>
                 </div>

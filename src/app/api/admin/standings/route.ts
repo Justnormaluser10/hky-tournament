@@ -51,6 +51,7 @@ export async function POST(req: NextRequest) {
       points,
       position,
       notes,
+      qualificationStatus,
     } = body;
 
     if (!teamId) {
@@ -65,6 +66,21 @@ export async function POST(req: NextRequest) {
     const team = await prisma.team.findUnique({ where: { id: teamId } });
     if (!team) {
       return NextResponse.json({ error: 'Team not found.' }, { status: 404 });
+    }
+
+    if (qualificationStatus !== undefined) {
+      const qVal = qualificationStatus && String(qualificationStatus).trim()
+        ? String(qualificationStatus).trim().toUpperCase()
+        : null;
+      await prisma.team.update({
+        where: { id: teamId },
+        data: { qualificationStatus: qVal },
+      });
+      await logActivity(
+        auth.admin.email,
+        'SET_QUALIFICATION_STATUS',
+        `Admin set qualification status of "${team.name}" to ${qVal || 'NONE'}`
+      );
     }
 
     const parseNum = (val: any) =>
@@ -112,6 +128,52 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error('Error saving standings override:', error);
     return NextResponse.json({ error: 'Failed to save standings correction' }, { status: 500 });
+  }
+}
+
+export async function PATCH(req: NextRequest) {
+  const auth = requireAdmin(req);
+  if (auth instanceof NextResponse) return auth;
+
+  try {
+    const body = await req.json();
+    const { teamId, qualificationStatus } = body;
+
+    if (!teamId) {
+      return NextResponse.json({ error: 'Team ID is required.' }, { status: 400 });
+    }
+
+    const team = await prisma.team.findUnique({ where: { id: teamId } });
+    if (!team) {
+      return NextResponse.json({ error: 'Team not found.' }, { status: 404 });
+    }
+
+    const qVal = qualificationStatus && String(qualificationStatus).trim()
+      ? String(qualificationStatus).trim().toUpperCase()
+      : null;
+
+    const updatedTeam = await prisma.team.update({
+      where: { id: teamId },
+      data: { qualificationStatus: qVal },
+    });
+
+    const tournament = await prisma.tournament.findFirst();
+    const updatedStandings = await calculateStandings(tournament?.id);
+
+    await logActivity(
+      auth.admin.email,
+      'SET_QUALIFICATION_STATUS',
+      `Admin set qualification status of "${team.name}" to ${qVal || 'NONE'}`
+    );
+
+    return NextResponse.json({
+      success: true,
+      team: updatedTeam,
+      standings: updatedStandings.standings,
+    });
+  } catch (error: any) {
+    console.error('Error updating qualification status:', error);
+    return NextResponse.json({ error: 'Failed to update qualification status' }, { status: 500 });
   }
 }
 

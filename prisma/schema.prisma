@@ -46,6 +46,7 @@ model Team {
   coach            String?
   description      String?
   primaryColor     String            @default("#059669")
+  qualificationStatus String?
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   awayMatches      Match[]           @relation("TeamB")

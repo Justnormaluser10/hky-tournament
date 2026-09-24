@@ -32,6 +32,7 @@ interface StandingRow {
   points: number;
   form: string[];
   isQualified: boolean;
+  qualificationStatus?: string | null;
   isOverridden?: boolean;
   overrideNotes?: string | null;
 }
@@ -43,6 +44,7 @@ export default function AdminStandingsPage() {
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [updatingStatusTeamId, setUpdatingStatusTeamId] = useState<string | null>(null);
 
   // Edit Modal State
   const [editRow, setEditRow] = useState<StandingRow | null>(null);
@@ -54,6 +56,7 @@ export default function AdminStandingsPage() {
   const [gfInput, setGfInput] = useState<number>(0);
   const [gaInput, setGaInput] = useState<number>(0);
   const [ptsInput, setPtsInput] = useState<number>(0);
+  const [qStatusInput, setQStatusInput] = useState<string>('');
   const [notesInput, setNotesInput] = useState<string>('');
 
   const fetchStandings = async () => {
@@ -76,6 +79,33 @@ export default function AdminStandingsPage() {
     fetchStandings();
   }, []);
 
+  const handleSetQualificationStatus = async (teamId: string, status: string | null) => {
+    setUpdatingStatusTeamId(teamId);
+    setActionError(null);
+    try {
+      const res = await fetch('/api/admin/standings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ teamId, qualificationStatus: status }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        if (data.standings) {
+          setStandings(data.standings);
+        } else {
+          fetchStandings();
+        }
+        setActionSuccess(`Updated qualification status to ${status || 'NONE'}`);
+      } else {
+        setActionError(data.error || 'Failed to update qualification status');
+      }
+    } catch (e) {
+      setActionError('Error updating qualification status');
+    } finally {
+      setUpdatingStatusTeamId(null);
+    }
+  };
+
   const openEditModal = (row: StandingRow) => {
     setEditRow(row);
     setPosInput(String(row.position));
@@ -86,6 +116,7 @@ export default function AdminStandingsPage() {
     setGfInput(row.goalsFor);
     setGaInput(row.goalsAgainst);
     setPtsInput(row.points);
+    setQStatusInput(row.qualificationStatus || '');
     setNotesInput(row.overrideNotes || '');
     setActionError(null);
   };
@@ -113,6 +144,7 @@ export default function AdminStandingsPage() {
           goalsAgainst: Number(gaInput),
           goalDifference: calcGD,
           points: Number(ptsInput),
+          qualificationStatus: qStatusInput || null,
           notes: notesInput,
         }),
       });
@@ -275,7 +307,8 @@ export default function AdminStandingsPage() {
                 <th className="py-4 px-2.5 text-center" title="Goals Against">GA</th>
                 <th className="py-4 px-2.5 text-center font-bold" title="Goal Difference">GD</th>
                 <th className="py-4 px-3 text-center font-black text-amber-400 text-base" title="Points">Pts</th>
-                <th className="py-4 px-3 text-center">Status</th>
+                <th className="py-4 px-3 text-center">Status (Q/E)</th>
+                <th className="py-4 px-3 text-center">Overrides</th>
                 <th className="py-4 px-3 text-center">Action</th>
               </tr>
             </thead>
@@ -283,13 +316,13 @@ export default function AdminStandingsPage() {
             <tbody className="divide-y divide-white/5 font-medium">
               {loading ? (
                 <tr>
-                  <td colSpan={12} className="py-12 text-center text-slate-400">
+                  <td colSpan={13} className="py-12 text-center text-slate-400">
                     Loading standings data...
                   </td>
                 </tr>
               ) : standings.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="py-12 text-center text-slate-400">
+                  <td colSpan={13} className="py-12 text-center text-slate-400">
                     No teams or standings records available.
                   </td>
                 </tr>
@@ -347,6 +380,51 @@ export default function AdminStandingsPage() {
                       </td>
                       <td className="py-3.5 px-3 text-center font-mono font-black text-amber-400 text-base">
                         {row.points}
+                      </td>
+
+                      {/* Qualification Status (Q / E / Clear) */}
+                      <td className="py-3.5 px-3 text-center">
+                        <div className="inline-flex items-center rounded-lg bg-slate-950 p-1 border border-white/10 gap-1 shadow-inner">
+                          <button
+                            type="button"
+                            onClick={() => handleSetQualificationStatus(row.teamId, null)}
+                            disabled={updatingStatusTeamId === row.teamId}
+                            title="Clear qualification status"
+                            className={`px-2 py-0.5 rounded text-[11px] font-bold font-mono transition ${
+                              !row.qualificationStatus
+                                ? 'bg-slate-700 text-white shadow-sm'
+                                : 'text-slate-400 hover:text-white'
+                            }`}
+                          >
+                            —
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSetQualificationStatus(row.teamId, 'Q')}
+                            disabled={updatingStatusTeamId === row.teamId}
+                            title="Mark as Qualified (Q)"
+                            className={`px-2 py-0.5 rounded text-[11px] font-black transition ${
+                              row.qualificationStatus === 'Q'
+                                ? 'bg-emerald-500 text-white shadow-md ring-1 ring-emerald-300'
+                                : 'text-emerald-400 hover:bg-emerald-500/20'
+                            }`}
+                          >
+                            Q
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSetQualificationStatus(row.teamId, 'E')}
+                            disabled={updatingStatusTeamId === row.teamId}
+                            title="Mark as Eliminated (E)"
+                            className={`px-2 py-0.5 rounded text-[11px] font-black transition ${
+                              row.qualificationStatus === 'E'
+                                ? 'bg-rose-500 text-white shadow-md ring-1 ring-rose-300'
+                                : 'text-rose-400 hover:bg-rose-500/20'
+                            }`}
+                          >
+                            E
+                          </button>
+                        </div>
                       </td>
 
                       <td className="py-3.5 px-3 text-center">
@@ -547,6 +625,22 @@ export default function AdminStandingsPage() {
                       : Number(gfInput) - Number(gaInput)}
                   </div>
                 </div>
+              </div>
+
+              {/* Qualification Status (Q / E) */}
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-300 mb-1">
+                  Qualification Status (Q / E)
+                </label>
+                <select
+                  value={qStatusInput}
+                  onChange={(e) => setQStatusInput(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-white/10 text-white text-xs focus:border-emerald-500 focus:outline-none"
+                >
+                  <option value="">None (Regular League Team)</option>
+                  <option value="Q">Q — Qualified for Knockouts</option>
+                  <option value="E">E — Eliminated from Tournament</option>
+                </select>
               </div>
 
               {/* Correction Notes / Reason */}

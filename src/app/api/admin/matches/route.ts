@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdmin } from '@/lib/adminGuard';
 import { logActivity } from '@/lib/activity';
-import { syncKnockoutSeeds, advanceKnockoutWinner, checkLeagueStageStatus } from '@/lib/engine';
+import { syncKnockoutSeeds, advanceKnockoutWinner, checkLeagueStageStatus, generateKnockoutStages } from '@/lib/engine';
 
 export async function GET(req: NextRequest) {
   const auth = requireAdmin(req);
@@ -259,7 +259,7 @@ export async function PUT(req: NextRequest) {
       console.warn('Knockout sync/progression warning:', e);
     }
 
-    // Automatically check league stage completion to manage persistent LEAGUE <-> LEAGUE_COMPLETE state
+    // Automatically check league stage completion to manage persistent LEAGUE <-> KNOCKOUT state
     try {
       if (updated.round === 'LEAGUE') {
         const tournament = await prisma.tournament.findUnique({
@@ -269,21 +269,66 @@ export async function PUT(req: NextRequest) {
         if (tournament) {
           const leagueStatus = await checkLeagueStageStatus(tournament.id);
 
-          if (tournament.currentStage === 'LEAGUE' && leagueStatus.isComplete) {
-            await prisma.tournament.update({
-              where: { id: tournament.id },
-              data: { currentStage: 'LEAGUE_COMPLETE' },
+          if (leagueStatus.isComplete) {
+            // Once all required league matches are completed, activate knockout stage and lock top 4
+            const knockoutCount = await prisma.knockoutMatch.count({
+              where: { match: { tournamentId: tournament.id } },
             });
-            await logActivity(
-              auth.admin.email,
-              'LEAGUE_COMPLETED',
-              `All ${leagueStatus.completedMatches}/${leagueStatus.expectedMatches} league fixtures finished. League stage complete — awaiting admin knockout activation.`
-            );
-          } else if (tournament.currentStage === 'LEAGUE_COMPLETE' && !leagueStatus.isComplete) {
-            await prisma.tournament.update({
-              where: { id: tournament.id },
-              data: { currentStage: 'LEAGUE' },
-            });
+
+            if (knockoutCount === 0) {
+              await generateKnockoutStages(tournament.id);
+              await logActivity(
+                auth.admin.email,
+                'LEAGUE_COMPLETED_KNOCKOUT_ACTIVATED',
+                `All ${leagueStatus.completedMatches}/${leagueStatus.expectedMatches} league fixtures finished! Officially activated IPL-style knockout stage for top 4 teams.`
+              );
+            } else if (tournament.currentStage === 'LEAGUE' || tournament.currentStage === 'LEAGUE_COMPLETE') {
+              await prisma.tournament.update({
+                where: { id: tournament.id },
+                data: { currentStage: 'KNOCKOUT' },
+              });
+            }
+          } else if (!leagueStatus.isComplete) {
+            // If a completed league score was reverted or modified so league is incomplete again
+            if (['KNOCKOUT', 'LEAGUE_COMPLETE'].includes(tournament.currentStage)) {
+              // Check if any knockout match was already played
+              const playedKnockouts = await prisma.knockoutMatch.count({
+                where: {
+                  match: {
+                    tournamentId: tournament.id,
+                    status: { in: ['COMPLETED', 'LIVE'] },
+                  },
+                },
+              });
+
+              if (playedKnockouts === 0) {
+                // Safely remove unplayed knockout matches and reset to LEAGUE
+                const pendingKnockoutMatches = await prisma.knockoutMatch.findMany({
+                  where: { match: { tournamentId: tournament.id } },
+                  select: { id: true, matchId: true },
+                });
+                const matchIds = pendingKnockoutMatches.map((k) => k.matchId);
+                await prisma.knockoutMatch.deleteMany({
+                  where: { id: { in: pendingKnockoutMatches.map((k) => k.id) } },
+                });
+                await prisma.matchEvent.deleteMany({
+                  where: { matchId: { in: matchIds } },
+                });
+                await prisma.match.deleteMany({
+                  where: { id: { in: matchIds } },
+                });
+
+                await prisma.tournament.update({
+                  where: { id: tournament.id },
+                  data: { currentStage: 'LEAGUE' },
+                });
+              } else {
+                await prisma.tournament.update({
+                  where: { id: tournament.id },
+                  data: { currentStage: 'LEAGUE' },
+                });
+              }
+            }
           }
         }
       }

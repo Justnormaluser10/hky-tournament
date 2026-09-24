@@ -231,9 +231,10 @@ export default function AdminTournamentConfigPage() {
               >
                 <option value="LEAGUE">LEAGUE</option>
                 <option value="LEAGUE_COMPLETED">LEAGUE_COMPLETED</option>
-                <option value="KNOCKOUT">KNOCKOUT</option>
-                <option value="QUARTER_FINALS">QUARTER_FINALS</option>
-                <option value="SEMI_FINALS">SEMI_FINALS</option>
+                <option value="KNOCKOUT">KNOCKOUT (Playoffs)</option>
+                <option value="QUALIFIER_1">QUALIFIER_1</option>
+                <option value="ELIMINATOR">ELIMINATOR</option>
+                <option value="QUALIFIER_2">QUALIFIER_2</option>
                 <option value="FINAL">FINAL</option>
                 <option value="COMPLETED">COMPLETED</option>
               </select>

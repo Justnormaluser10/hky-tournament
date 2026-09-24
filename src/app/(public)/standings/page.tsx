@@ -1,20 +1,20 @@
 import React from 'react';
 import Link from 'next/link';
 import { TableProperties, Trophy, ArrowRight, GitFork } from 'lucide-react';
-import { calculateStandings } from '@/lib/engine';
+import { calculateStandings, getKnockoutData } from '@/lib/engine';
 import { TeamLogo } from '@/components/ui/TeamLogo';
+import { KnockoutBracket } from '@/components/public/KnockoutBracket';
 
 export const revalidate = 0;
 
 export default async function StandingsPage() {
-  const { standings, tournament } = await calculateStandings();
+  const [{ standings, tournament }, knockoutData] = await Promise.all([
+    calculateStandings(),
+    getKnockoutData(),
+  ]);
+
   const qualificationCount = tournament?.qualificationCount || 4;
-  const isKnockoutActive =
-    tournament?.currentStage === 'KNOCKOUT' ||
-    tournament?.currentStage === 'QUARTER_FINALS' ||
-    tournament?.currentStage === 'SEMI_FINALS' ||
-    tournament?.currentStage === 'FINAL' ||
-    tournament?.currentStage === 'COMPLETED';
+  const isKnockoutActive = knockoutData.isKnockoutActive;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 space-y-8">
@@ -37,17 +37,6 @@ export default async function StandingsPage() {
 
         {/* Right Header Badges */}
         <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
-          {isKnockoutActive && (
-            <Link
-              href="/"
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-purple-900/50 hover:bg-purple-800/50 text-purple-200 border border-purple-500/40 text-xs font-black uppercase tracking-wider transition"
-            >
-              <GitFork className="w-3.5 h-3.5 text-purple-400" />
-              <span>View Knockout Bracket</span>
-              <ArrowRight className="w-3 h-3" />
-            </Link>
-          )}
-
           <div className="flex items-center gap-2 p-2.5 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-xs">
             <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
             <span className="text-slate-300 font-semibold">
@@ -111,7 +100,7 @@ export default async function StandingsPage() {
                           </span>
                         </td>
 
-                        {/* Team Name and Logo (Sticky on mobile scroll) */}
+                        {/* Team Name and Logo with inline Q/E badge (Sticky on mobile scroll) */}
                         <td className="py-3.5 px-3 sticky left-0 bg-slate-950/95 z-10">
                           <Link
                             href={`/teams/${row.teamId}`}
@@ -124,10 +113,26 @@ export default async function StandingsPage() {
                               primaryColor={row.primaryColor}
                               size="sm"
                             />
-                            <div className="truncate max-w-[130px] sm:max-w-none">
-                              <span className="font-bold text-white text-xs sm:text-sm group-hover:text-emerald-300 transition block truncate">
+                            <div className="truncate max-w-[150px] sm:max-w-none flex items-center gap-1.5">
+                              <span className="font-bold text-white text-xs sm:text-sm group-hover:text-emerald-300 transition truncate">
                                 {row.name}
                               </span>
+                              {row.qualificationStatus === 'Q' && (
+                                <span
+                                  className="inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[10px] font-black bg-emerald-500/25 text-emerald-300 border border-emerald-500/50 shadow-sm shrink-0"
+                                  title="Qualified for Knockouts (Q)"
+                                >
+                                  Q
+                                </span>
+                              )}
+                              {row.qualificationStatus === 'E' && (
+                                <span
+                                  className="inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[10px] font-black bg-rose-500/25 text-rose-300 border border-rose-500/50 shadow-sm shrink-0"
+                                  title="Eliminated (E)"
+                                >
+                                  E
+                                </span>
+                              )}
                               <span className="text-[10px] text-slate-400 font-mono sm:hidden">
                                 {row.shortName}
                               </span>
@@ -179,7 +184,7 @@ export default async function StandingsPage() {
                         <tr className="bg-emerald-950/80 border-y-2 border-emerald-500/80">
                           <td colSpan={11} className="py-2 px-4 text-center">
                             <span className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-emerald-300">
-                              ──────── Top {qualificationCount} Advance to Knockouts ────────
+                              ──────── Top {qualificationCount} Advance to Playoffs ────────
                             </span>
                           </td>
                         </tr>
@@ -193,32 +198,41 @@ export default async function StandingsPage() {
         </div>
       </div>
 
-      {/* Knockout Playoff Link if active */}
-      {isKnockoutActive && (
-        <div className="glass-card rounded-2xl p-5 border border-amber-500/30 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-3 text-center sm:text-left">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
-              <Trophy className="w-5 h-5" />
+      {/* KNOCKOUT BRACKET / PREVIEW SECTION (Always present on Standings page) */}
+      <section className="space-y-4 pt-2">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-4">
+          <div>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-bold uppercase tracking-wider mb-1.5">
+              <Trophy className="w-3.5 h-3.5 text-amber-400" />
+              Championship Knockouts
             </div>
-            <div>
-              <h3 className="font-black text-white text-sm uppercase tracking-wider">
-                Knockout Stage is Live!
-              </h3>
-              <p className="text-xs text-slate-400">
-                The top qualifying teams are clashing in the Championship Playoffs.
-              </p>
-            </div>
+            <h2 className="text-xl sm:text-3xl font-black text-white uppercase tracking-tight">
+              {knockoutData.isPreview
+                ? 'Playoff Bracket Preview'
+                : 'Playoff Knockout Bracket'}
+            </h2>
+            <p className="text-xs text-slate-400 mt-0.5">
+              {knockoutData.isPreview
+                ? 'IPL-style Top 4 progression projected dynamically from current league positions'
+                : 'Official IPL-style playoff championship matches'}
+            </p>
           </div>
 
-          <Link
-            href="/"
-            className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 text-white font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 transition hover:from-emerald-500 hover:to-emerald-400 shrink-0"
-          >
-            <span>View Knockout Bracket</span>
-            <ArrowRight className="w-4 h-4" />
-          </Link>
+          <div className="text-xs text-slate-400 font-mono">
+            {knockoutData.isPreview ? (
+              <span className="text-amber-400 font-bold">🔒 Preview Mode • Locked during league</span>
+            ) : (
+              <span className="text-emerald-400 font-bold">🟢 Knockouts Live</span>
+            )}
+          </div>
         </div>
-      )}
+
+        <KnockoutBracket
+          knockoutMatches={knockoutData.knockoutMatches}
+          currentStage={tournament?.currentStage}
+          isPreview={knockoutData.isPreview}
+        />
+      </section>
     </div>
   );
 }

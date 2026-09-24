@@ -71,6 +71,9 @@ export function TournamentProgressionCard({
     tournament.currentStage === 'UPCOMING';
   const isKnockoutActive =
     tournament.currentStage === 'KNOCKOUT' ||
+    tournament.currentStage === 'QUALIFIER_1' ||
+    tournament.currentStage === 'ELIMINATOR' ||
+    tournament.currentStage === 'QUALIFIER_2' ||
     tournament.currentStage === 'QUARTER_FINALS' ||
     tournament.currentStage === 'SEMI_FINALS' ||
     tournament.currentStage === 'FINAL';
@@ -311,7 +314,7 @@ export function TournamentProgressionCard({
               <div>
                 <h4 className="font-black text-white text-sm uppercase">🏆 Knockout Stage Active</h4>
                 <p className="text-slate-300 mt-0.5">
-                  Playoffs are live! Record semifinal scores to automatically populate the Grand Championship Final.
+                  Playoffs are live! Record Qualifier and Eliminator scores to automatically progress teams to Qualifier 2 and the Grand Championship Final.
                 </p>
               </div>
             </div>

@@ -1,4 +1,5 @@
 import { prisma } from './prisma';
+import { getKnockoutOverrides } from './knockoutOverrides';
 
 export interface StandingRow {
   position: number;
@@ -17,6 +18,7 @@ export interface StandingRow {
   points: number;
   form: string[];
   isQualified: boolean;
+  qualificationStatus?: string | null;
   isOverridden?: boolean;
   overrideNotes?: string | null;
 }
@@ -160,6 +162,7 @@ export async function calculateStandings(tournamentId?: string): Promise<{
       points: 0,
       form: [],
       isQualified: false,
+      qualificationStatus: team.qualificationStatus || null,
       isOverridden: false,
       overrideNotes: null,
     };
@@ -457,65 +460,90 @@ export async function generateKnockoutStages(tournamentId: string): Promise<{
     });
     createdCount = 1;
   } else if (qualificationCount === 4) {
-    // Top 4: Semi-Finals -> Final
-    // SF1: 1st vs 4th
-    const sf1 = await prisma.match.create({
+    // IPL-Style Format: Top 4
+    // 1. QUALIFIER 1: League #1 vs League #2
+    const q1Match = await prisma.match.create({
       data: {
         tournamentId: tournament.id,
-        round: 'SEMI_FINAL',
+        round: 'QUALIFIER_1',
         matchNumber: matchCounter++,
         teamAId: standings[0].teamId,
-        teamBId: standings[3].teamId,
+        teamBId: standings[1].teamId,
         venue: 'Pitch 1 - Main Turf Arena',
         time: '05:00 PM',
         status: 'UPCOMING',
-        notes: `Semi Final 1: 1st (${standings[0].name}) vs 4th (${standings[3].name})`,
+        notes: `Qualifier 1: 1st (${standings[0].name}) vs 2nd (${standings[1].name}) [Winner to Final, Loser to Qualifier 2]`,
       },
     });
 
     await prisma.knockoutMatch.create({
       data: {
-        stage: 'SEMI_FINALS',
-        matchId: sf1.id,
+        stage: 'QUALIFIER_1',
+        matchId: q1Match.id,
         bracketOrder: 1,
         seedLabelA: `1st: ${standings[0].name}`,
+        seedLabelB: `2nd: ${standings[1].name}`,
+      },
+    });
+
+    // 2. ELIMINATOR: League #3 vs League #4
+    const elimMatch = await prisma.match.create({
+      data: {
+        tournamentId: tournament.id,
+        round: 'ELIMINATOR',
+        matchNumber: matchCounter++,
+        teamAId: standings[2].teamId,
+        teamBId: standings[3].teamId,
+        venue: 'Pitch 1 - Main Turf Arena',
+        time: '07:00 PM',
+        status: 'UPCOMING',
+        notes: `Eliminator: 3rd (${standings[2].name}) vs 4th (${standings[3].name}) [Winner to Qualifier 2, Loser Eliminated]`,
+      },
+    });
+
+    await prisma.knockoutMatch.create({
+      data: {
+        stage: 'ELIMINATOR',
+        matchId: elimMatch.id,
+        bracketOrder: 2,
+        seedLabelA: `3rd: ${standings[2].name}`,
         seedLabelB: `4th: ${standings[3].name}`,
       },
     });
 
-    // SF2: 2nd vs 3rd
-    const sf2 = await prisma.match.create({
+    // 3. QUALIFIER 2: Loser of Qualifier 1 vs Winner of Eliminator
+    const q2Match = await prisma.match.create({
       data: {
         tournamentId: tournament.id,
-        round: 'SEMI_FINAL',
+        round: 'QUALIFIER_2',
         matchNumber: matchCounter++,
-        teamAId: standings[1].teamId,
-        teamBId: standings[2].teamId,
+        teamAId: null, // Placeholder: Loser of Qualifier 1
+        teamBId: null, // Placeholder: Winner of Eliminator
         venue: 'Pitch 1 - Main Turf Arena',
-        time: '07:00 PM',
+        time: '06:00 PM',
         status: 'UPCOMING',
-        notes: `Semi Final 2: 2nd (${standings[1].name}) vs 3rd (${standings[2].name})`,
+        notes: 'Qualifier 2: Loser Qualifier 1 vs Winner Eliminator [Winner to Final, Loser Eliminated]',
       },
     });
 
     await prisma.knockoutMatch.create({
       data: {
-        stage: 'SEMI_FINALS',
-        matchId: sf2.id,
-        bracketOrder: 2,
-        seedLabelA: `2nd: ${standings[1].name}`,
-        seedLabelB: `3rd: ${standings[2].name}`,
+        stage: 'QUALIFIER_2',
+        matchId: q2Match.id,
+        bracketOrder: 3,
+        seedLabelA: 'Loser Qualifier 1',
+        seedLabelB: 'Winner Eliminator',
       },
     });
 
-    // Grand Final: STRICT REQUIREMENT 17 - DO NOT pre-assign teams. Placeholders until SFs finish!
-    const finalM = await prisma.match.create({
+    // 4. FINAL: Winner of Qualifier 1 vs Winner of Qualifier 2
+    const finalMatch = await prisma.match.create({
       data: {
         tournamentId: tournament.id,
         round: 'FINAL',
         matchNumber: matchCounter++,
-        teamAId: null, // Placeholder until SF1 finishes
-        teamBId: null, // Placeholder until SF2 finishes
+        teamAId: null, // Placeholder: Winner of Qualifier 1
+        teamBId: null, // Placeholder: Winner of Qualifier 2
         venue: 'Pitch 1 - Grand Arena Amreli',
         time: '08:00 PM',
         status: 'UPCOMING',
@@ -526,16 +554,16 @@ export async function generateKnockoutStages(tournamentId: string): Promise<{
     await prisma.knockoutMatch.create({
       data: {
         stage: 'FINAL',
-        matchId: finalM.id,
-        bracketOrder: 3,
-        seedLabelA: 'Winner Semi Final 1',
-        seedLabelB: 'Winner Semi Final 2',
+        matchId: finalMatch.id,
+        bracketOrder: 4,
+        seedLabelA: 'Winner Qualifier 1',
+        seedLabelB: 'Winner Qualifier 2',
       },
     });
-    createdCount = 3;
+
+    createdCount = 4;
   } else if (qualificationCount === 8) {
     // Top 8: Quarter-Finals -> Semi-Finals -> Final
-    // QF1: 1 vs 8, QF2: 4 vs 5, QF3: 2 vs 7, QF4: 3 vs 6
     const pairs = [
       { a: 0, b: 7, labelA: '1st', labelB: '8th', name: 'Quarter Final 1' },
       { a: 3, b: 4, labelA: '4th', labelB: '5th', name: 'Quarter Final 2' },
@@ -570,7 +598,6 @@ export async function generateKnockoutStages(tournamentId: string): Promise<{
       });
     }
 
-    // SF1 & SF2: Placeholders until QFs finish
     const sf1 = await prisma.match.create({
       data: {
         tournamentId: tournament.id,
@@ -617,7 +644,6 @@ export async function generateKnockoutStages(tournamentId: string): Promise<{
       },
     });
 
-    // Final: Placeholders until SFs finish
     const finalM = await prisma.match.create({
       data: {
         tournamentId: tournament.id,
@@ -644,13 +670,13 @@ export async function generateKnockoutStages(tournamentId: string): Promise<{
     createdCount = 7;
   }
 
-  // Update tournament state in DB to KNOCKOUT / SEMI_FINALS / QUARTER_FINALS / FINAL
+  // Update tournament state in DB
   const targetStage =
     qualificationCount === 2
       ? 'FINAL'
       : qualificationCount === 8
       ? 'QUARTER_FINALS'
-      : 'SEMI_FINALS';
+      : 'KNOCKOUT';
 
   await prisma.tournament.update({
     where: { id: tournament.id },
@@ -665,8 +691,8 @@ export async function generateKnockoutStages(tournamentId: string): Promise<{
 }
 
 /**
- * Automatically advances winners to the next knockout round when a match score is updated,
- * and handles retroactive score changes.
+ * Automatically advances winners and losers according to the IPL knockout format
+ * when a match score is updated, and handles retroactive corrections.
  */
 export async function advanceKnockoutWinner(matchId: string) {
   const match = await prisma.match.findUnique({
@@ -683,20 +709,25 @@ export async function advanceKnockoutWinner(matchId: string) {
   const stage = kMatch.stage;
   const tournamentId = match.tournamentId;
 
-  // Determine current match winner
+  // Determine current match winner and loser
   let winnerId: string | null = null;
+  let loserId: string | null = null;
+
   if (match.status === 'COMPLETED') {
     if (match.teamAScore > match.teamBScore) {
       winnerId = match.teamAId;
+      loserId = match.teamBId;
     } else if (match.teamBScore > match.teamAScore) {
       winnerId = match.teamBId;
+      loserId = match.teamAId;
     } else {
-      // Tied at full time: use manually specified winner or team A
+      // Tied: use manually specified winner or team A
       winnerId = match.winnerId || match.teamAId;
+      loserId = winnerId === match.teamAId ? match.teamBId : match.teamAId;
     }
   }
 
-  // Update match winnerId
+  // Update match winnerId if changed
   if (match.winnerId !== winnerId) {
     await prisma.match.update({
       where: { id: matchId },
@@ -704,83 +735,135 @@ export async function advanceKnockoutWinner(matchId: string) {
     });
   }
 
-  // 1. Semi-Finals -> Grand Final Advancement
-  if (stage === 'SEMI_FINALS') {
-    const finalKnockout = await prisma.knockoutMatch.findFirst({
-      where: {
-        match: { tournamentId },
-        stage: 'FINAL',
-      },
-      include: { match: true },
-    });
+  // Find all knockout matches for this tournament
+  const allKnockouts = await prisma.knockoutMatch.findMany({
+    where: { match: { tournamentId } },
+    include: { match: true },
+  });
 
+  const q2Knockout = allKnockouts.find((k) => k.stage === 'QUALIFIER_2');
+  const finalKnockout = allKnockouts.find((k) => k.stage === 'FINAL');
+
+  // 1. QUALIFIER 1 Progression:
+  // Winner -> directly qualifies for FINAL (teamA)
+  // Loser -> goes to QUALIFIER 2 (teamA)
+  if (stage === 'QUALIFIER_1') {
     if (finalKnockout) {
-      const isSF1 = kMatch.bracketOrder === 1;
-      const isSF2 = kMatch.bracketOrder === 2;
-
-      if (isSF1) {
+      const isManualFinalA = finalKnockout.match?.notes?.includes('MANUAL_SEED');
+      if (!isManualFinalA) {
         await prisma.match.update({
           where: { id: finalKnockout.matchId },
           data: { teamAId: winnerId || null },
         });
-      } else if (isSF2) {
+        if (winnerId) {
+          const winTeam = await prisma.team.findUnique({ where: { id: winnerId } });
+          await prisma.knockoutMatch.update({
+            where: { id: finalKnockout.id },
+            data: { seedLabelA: winTeam ? `Winner Q1: ${winTeam.name}` : 'Winner Qualifier 1' },
+          });
+        } else {
+          await prisma.knockoutMatch.update({
+            where: { id: finalKnockout.id },
+            data: { seedLabelA: 'Winner Qualifier 1' },
+          });
+        }
+      }
+    }
+
+    if (q2Knockout) {
+      const isManualQ2A = q2Knockout.match?.notes?.includes('MANUAL_SEED');
+      if (!isManualQ2A) {
+        await prisma.match.update({
+          where: { id: q2Knockout.matchId },
+          data: { teamAId: loserId || null },
+        });
+        if (loserId) {
+          const loseTeam = await prisma.team.findUnique({ where: { id: loserId } });
+          await prisma.knockoutMatch.update({
+            where: { id: q2Knockout.id },
+            data: { seedLabelA: loseTeam ? `Loser Q1: ${loseTeam.name}` : 'Loser Qualifier 1' },
+          });
+        } else {
+          await prisma.knockoutMatch.update({
+            where: { id: q2Knockout.id },
+            data: { seedLabelA: 'Loser Qualifier 1' },
+          });
+        }
+      }
+    }
+  }
+
+  // 2. ELIMINATOR Progression:
+  // Winner -> goes to QUALIFIER 2 (teamB)
+  // Loser -> eliminated
+  if (stage === 'ELIMINATOR') {
+    if (q2Knockout) {
+      const isManualQ2B = q2Knockout.match?.notes?.includes('MANUAL_SEED');
+      if (!isManualQ2B) {
+        await prisma.match.update({
+          where: { id: q2Knockout.matchId },
+          data: { teamBId: winnerId || null },
+        });
+        if (winnerId) {
+          const winTeam = await prisma.team.findUnique({ where: { id: winnerId } });
+          await prisma.knockoutMatch.update({
+            where: { id: q2Knockout.id },
+            data: { seedLabelB: winTeam ? `Winner Eliminator: ${winTeam.name}` : 'Winner Eliminator' },
+          });
+        } else {
+          await prisma.knockoutMatch.update({
+            where: { id: q2Knockout.id },
+            data: { seedLabelB: 'Winner Eliminator' },
+          });
+        }
+      }
+    }
+  }
+
+  // 3. QUALIFIER 2 Progression:
+  // Winner -> qualifies for FINAL (teamB)
+  // Loser -> eliminated
+  if (stage === 'QUALIFIER_2') {
+    if (finalKnockout) {
+      const isManualFinalB = finalKnockout.match?.notes?.includes('MANUAL_SEED');
+      if (!isManualFinalB) {
         await prisma.match.update({
           where: { id: finalKnockout.matchId },
           data: { teamBId: winnerId || null },
         });
+        if (winnerId) {
+          const winTeam = await prisma.team.findUnique({ where: { id: winnerId } });
+          await prisma.knockoutMatch.update({
+            where: { id: finalKnockout.id },
+            data: { seedLabelB: winTeam ? `Winner Q2: ${winTeam.name}` : 'Winner Qualifier 2' },
+          });
+        } else {
+          await prisma.knockoutMatch.update({
+            where: { id: finalKnockout.id },
+            data: { seedLabelB: 'Winner Qualifier 2' },
+          });
+        }
       }
+    }
+  }
 
-      // Check if both SFs are completed -> move stage to FINAL
-      const allSFs = await prisma.knockoutMatch.findMany({
-        where: { match: { tournamentId }, stage: 'SEMI_FINALS' },
-        include: { match: true },
+  // Legacy SEMI_FINALS support if needed
+  if (stage === 'SEMI_FINALS' && finalKnockout) {
+    if (kMatch.bracketOrder === 1) {
+      await prisma.match.update({
+        where: { id: finalKnockout.matchId },
+        data: { teamAId: winnerId || null },
       });
-      const allCompleted = allSFs.every((sf) => sf.match.status === 'COMPLETED');
-      if (allCompleted) {
-        await prisma.tournament.update({
-          where: { id: tournamentId },
-          data: { currentStage: 'FINAL' },
-        });
-      }
+    } else if (kMatch.bracketOrder === 2) {
+      await prisma.match.update({
+        where: { id: finalKnockout.matchId },
+        data: { teamBId: winnerId || null },
+      });
     }
   }
 
-  // 2. Quarter-Finals -> Semi-Finals Advancement
-  if (stage === 'QUARTER_FINALS') {
-    const sfMatches = await prisma.knockoutMatch.findMany({
-      where: { match: { tournamentId }, stage: 'SEMI_FINALS' },
-      include: { match: true },
-      orderBy: { bracketOrder: 'asc' },
-    });
-
-    if (sfMatches.length >= 2) {
-      // QF1 (1) -> SF1 teamA, QF2 (2) -> SF1 teamB
-      // QF3 (3) -> SF2 teamA, QF4 (4) -> SF2 teamB
-      if (kMatch.bracketOrder === 1) {
-        await prisma.match.update({
-          where: { id: sfMatches[0].matchId },
-          data: { teamAId: winnerId || null },
-        });
-      } else if (kMatch.bracketOrder === 2) {
-        await prisma.match.update({
-          where: { id: sfMatches[0].matchId },
-          data: { teamBId: winnerId || null },
-        });
-      } else if (kMatch.bracketOrder === 3) {
-        await prisma.match.update({
-          where: { id: sfMatches[1].matchId },
-          data: { teamAId: winnerId || null },
-        });
-      } else if (kMatch.bracketOrder === 4) {
-        await prisma.match.update({
-          where: { id: sfMatches[1].matchId },
-          data: { teamBId: winnerId || null },
-        });
-      }
-    }
-  }
-
-  // 3. Final -> Champions
+  // 4. FINAL Progression:
+  // Winner -> Tournament Champion
   if (stage === 'FINAL') {
     if (match.status === 'COMPLETED' && winnerId) {
       await prisma.tournament.update({
@@ -790,6 +873,17 @@ export async function advanceKnockoutWinner(matchId: string) {
           status: 'COMPLETED',
         },
       });
+    } else if (match.status !== 'COMPLETED') {
+      const tournament = await prisma.tournament.findUnique({ where: { id: tournamentId } });
+      if (tournament && tournament.currentStage === 'COMPLETED') {
+        await prisma.tournament.update({
+          where: { id: tournamentId },
+          data: {
+            currentStage: 'KNOCKOUT',
+            status: 'LIVE',
+          },
+        });
+      }
     }
   }
 }
@@ -802,10 +896,15 @@ export async function syncKnockoutSeeds(tournamentId: string) {
   const tournament = await prisma.tournament.findUnique({ where: { id: tournamentId } });
   if (!tournament) return;
 
-  const isKnockout = ['KNOCKOUT', 'QUARTER_FINALS', 'SEMI_FINALS', 'FINAL'].includes(
-    tournament.currentStage
-  );
-  if (!isKnockout) return; // Do not touch seeds unless active in knockout stage
+  const isKnockout = [
+    'KNOCKOUT',
+    'QUALIFIER_1',
+    'ELIMINATOR',
+    'QUALIFIER_2',
+    'SEMI_FINALS',
+    'FINAL',
+  ].includes(tournament.currentStage);
+  if (!isKnockout) return;
 
   const { standings } = await calculateStandings(tournamentId);
   if (standings.length < 4) return;
@@ -816,40 +915,453 @@ export async function syncKnockoutSeeds(tournamentId: string) {
     orderBy: { bracketOrder: 'asc' },
   });
 
-  const sfMatches = knockoutMatches.filter((k) => k.stage === 'SEMI_FINALS');
-  if (sfMatches.length >= 2) {
-    const sf1 = sfMatches[0];
-    if (
-      sf1.match.status === 'UPCOMING' &&
-      standings[0] &&
-      standings[3] &&
-      !sf1.match.notes?.includes('MANUAL_SEED')
-    ) {
-      await prisma.match.update({
-        where: { id: sf1.matchId },
-        data: {
-          teamAId: standings[0].teamId,
-          teamBId: standings[3].teamId,
-        },
-      });
-    }
+  const q1 = knockoutMatches.find((k) => k.stage === 'QUALIFIER_1');
+  if (
+    q1 &&
+    q1.match.status === 'UPCOMING' &&
+    standings[0] &&
+    standings[1] &&
+    !q1.match.notes?.includes('MANUAL_SEED')
+  ) {
+    await prisma.match.update({
+      where: { id: q1.matchId },
+      data: {
+        teamAId: standings[0].teamId,
+        teamBId: standings[1].teamId,
+      },
+    });
+    await prisma.knockoutMatch.update({
+      where: { id: q1.id },
+      data: {
+        seedLabelA: `1st: ${standings[0].name}`,
+        seedLabelB: `2nd: ${standings[1].name}`,
+      },
+    });
+  }
 
-    const sf2 = sfMatches[1];
-    if (
-      sf2.match.status === 'UPCOMING' &&
-      standings[1] &&
-      standings[2] &&
-      !sf2.match.notes?.includes('MANUAL_SEED')
-    ) {
-      await prisma.match.update({
-        where: { id: sf2.matchId },
-        data: {
-          teamAId: standings[1].teamId,
-          teamBId: standings[2].teamId,
+  const elim = knockoutMatches.find((k) => k.stage === 'ELIMINATOR');
+  if (
+    elim &&
+    elim.match.status === 'UPCOMING' &&
+    standings[2] &&
+    standings[3] &&
+    !elim.match.notes?.includes('MANUAL_SEED')
+  ) {
+    await prisma.match.update({
+      where: { id: elim.matchId },
+      data: {
+        teamAId: standings[2].teamId,
+        teamBId: standings[3].teamId,
+      },
+    });
+    await prisma.knockoutMatch.update({
+      where: { id: elim.id },
+      data: {
+        seedLabelA: `3rd: ${standings[2].name}`,
+        seedLabelB: `4th: ${standings[3].name}`,
+      },
+    });
+  }
+}
+
+/**
+ * Returns knockout bracket data.
+ * If league is complete and knockouts are generated: returns the real database matches.
+ * If league is still running: dynamically projects the Top-4 IPL bracket from current standings.
+ */
+export async function getKnockoutData(tournamentId?: string) {
+  const tournament = tournamentId
+    ? await prisma.tournament.findUnique({ where: { id: tournamentId } })
+    : await prisma.tournament.findFirst();
+
+  if (!tournament) {
+    return {
+      tournament: null,
+      leagueStatus: null,
+      isKnockoutActive: false,
+      isPreview: false,
+      knockoutMatches: [],
+    };
+  }
+
+  const leagueStatus = await checkLeagueStageStatus(tournament.id);
+  const knockoutCount = await prisma.knockoutMatch.count({
+    where: { match: { tournamentId: tournament.id } },
+  });
+
+  const isKnockoutActive =
+    leagueStatus.isComplete &&
+    knockoutCount > 0 &&
+    [
+      'KNOCKOUT',
+      'QUALIFIER_1',
+      'ELIMINATOR',
+      'QUALIFIER_2',
+      'SEMI_FINALS',
+      'FINAL',
+      'COMPLETED',
+    ].includes(tournament.currentStage);
+
+  if (isKnockoutActive) {
+    try {
+      await syncKnockoutSeeds(tournament.id);
+    } catch {}
+
+    const knockoutMatches = await prisma.knockoutMatch.findMany({
+      where: { match: { tournamentId: tournament.id } },
+      include: {
+        match: {
+          include: {
+            teamA: {
+              select: {
+                id: true,
+                name: true,
+                shortName: true,
+                logo: true,
+                primaryColor: true,
+              },
+            },
+            teamB: {
+              select: {
+                id: true,
+                name: true,
+                shortName: true,
+                logo: true,
+                primaryColor: true,
+              },
+            },
+            events: {
+              where: { type: 'GOAL' },
+              include: {
+                player: { select: { id: true, name: true, jerseyNumber: true } },
+                team: { select: { id: true, shortName: true } },
+              },
+              orderBy: { minute: 'asc' },
+            },
+          },
         },
-      });
+      },
+      orderBy: { bracketOrder: 'asc' },
+    });
+
+    return {
+      tournament,
+      leagueStatus,
+      isKnockoutActive: true,
+      isPreview: false,
+      knockoutMatches,
+    };
+  }
+
+  // Projected Preview Mode (during league)
+  const { standings } = await calculateStandings(tournament.id);
+  const overrides = getKnockoutOverrides();
+
+  const allTeams = await prisma.team.findMany({
+    where: { tournamentId: tournament.id },
+    select: {
+      id: true,
+      name: true,
+      shortName: true,
+      logo: true,
+      primaryColor: true,
+    },
+  });
+  const teamsById = new Map(allTeams.map((t) => [t.id, t]));
+
+  const team1 = standings[0] ? teamsById.get(standings[0].teamId) || null : null;
+  const team2 = standings[1] ? teamsById.get(standings[1].teamId) || null : null;
+  const team3 = standings[2] ? teamsById.get(standings[2].teamId) || null : null;
+  const team4 = standings[3] ? teamsById.get(standings[3].teamId) || null : null;
+
+  const lastLeagueMatch = await prisma.match.findFirst({
+    where: { tournamentId: tournament.id, round: 'LEAGUE' },
+    orderBy: { matchNumber: 'desc' },
+  });
+  const baseNum = (lastLeagueMatch?.matchNumber || 15) + 1;
+
+  // 1. QUALIFIER 1
+  const ovQ1 = overrides['QUALIFIER_1'] || {};
+  let q1TeamA: any = null;
+  let q1SeedA: string | null = null;
+  if (ovQ1.teamAId === 'NO_TEAM') {
+    q1TeamA = null;
+    q1SeedA = 'NO TEAM';
+  } else if (ovQ1.teamAId && teamsById.has(ovQ1.teamAId)) {
+    q1TeamA = teamsById.get(ovQ1.teamAId);
+    q1SeedA = ovQ1.seedLabelA || q1TeamA.name;
+  } else {
+    q1TeamA = team1;
+    q1SeedA = team1 ? `1st: ${team1.name}` : 'League #1 (Rank 1)';
+  }
+
+  let q1TeamB: any = null;
+  let q1SeedB: string | null = null;
+  if (ovQ1.teamBId === 'NO_TEAM') {
+    q1TeamB = null;
+    q1SeedB = 'NO TEAM';
+  } else if (ovQ1.teamBId && teamsById.has(ovQ1.teamBId)) {
+    q1TeamB = teamsById.get(ovQ1.teamBId);
+    q1SeedB = ovQ1.seedLabelB || q1TeamB.name;
+  } else {
+    q1TeamB = team2;
+    q1SeedB = team2 ? `2nd: ${team2.name}` : 'League #2 (Rank 2)';
+  }
+
+  const q1ScoreA = ovQ1.teamAScore ?? 0;
+  const q1ScoreB = ovQ1.teamBScore ?? 0;
+  const q1Status = ovQ1.status || 'UPCOMING';
+  let winnerQ1: any = null;
+  let loserQ1: any = null;
+  if (q1Status === 'COMPLETED') {
+    if (q1ScoreA > q1ScoreB) {
+      winnerQ1 = q1TeamA;
+      loserQ1 = q1TeamB;
+    } else if (q1ScoreB > q1ScoreA) {
+      winnerQ1 = q1TeamB;
+      loserQ1 = q1TeamA;
+    } else {
+      winnerQ1 = ovQ1.winnerId === q1TeamB?.id ? q1TeamB : q1TeamA;
+      loserQ1 = winnerQ1 === q1TeamA ? q1TeamB : q1TeamA;
     }
   }
+
+  // 2. ELIMINATOR
+  const ovElim = overrides['ELIMINATOR'] || {};
+  let elimTeamA: any = null;
+  let elimSeedA: string | null = null;
+  if (ovElim.teamAId === 'NO_TEAM') {
+    elimTeamA = null;
+    elimSeedA = 'NO TEAM';
+  } else if (ovElim.teamAId && teamsById.has(ovElim.teamAId)) {
+    elimTeamA = teamsById.get(ovElim.teamAId);
+    elimSeedA = ovElim.seedLabelA || elimTeamA.name;
+  } else {
+    elimTeamA = team3;
+    elimSeedA = team3 ? `3rd: ${team3.name}` : 'League #3 (Rank 3)';
+  }
+
+  let elimTeamB: any = null;
+  let elimSeedB: string | null = null;
+  if (ovElim.teamBId === 'NO_TEAM') {
+    elimTeamB = null;
+    elimSeedB = 'NO TEAM';
+  } else if (ovElim.teamBId && teamsById.has(ovElim.teamBId)) {
+    elimTeamB = teamsById.get(ovElim.teamBId);
+    elimSeedB = ovElim.seedLabelB || elimTeamB.name;
+  } else {
+    elimTeamB = team4;
+    elimSeedB = team4 ? `4th: ${team4.name}` : 'League #4 (Rank 4)';
+  }
+
+  const elimScoreA = ovElim.teamAScore ?? 0;
+  const elimScoreB = ovElim.teamBScore ?? 0;
+  const elimStatus = ovElim.status || 'UPCOMING';
+  let winnerElim: any = null;
+  let loserElim: any = null;
+  if (elimStatus === 'COMPLETED') {
+    if (elimScoreA > elimScoreB) {
+      winnerElim = elimTeamA;
+      loserElim = elimTeamB;
+    } else if (elimScoreB > elimScoreA) {
+      winnerElim = elimTeamB;
+      loserElim = elimTeamA;
+    } else {
+      winnerElim = ovElim.winnerId === elimTeamB?.id ? elimTeamB : elimTeamA;
+      loserElim = winnerElim === elimTeamA ? elimTeamB : elimTeamA;
+    }
+  }
+
+  // 3. QUALIFIER 2 (Loser Q1 vs Winner Eliminator)
+  const ovQ2 = overrides['QUALIFIER_2'] || {};
+  let q2TeamA: any = null;
+  let q2SeedA: string | null = null;
+  if (ovQ2.teamAId === 'NO_TEAM') {
+    q2TeamA = null;
+    q2SeedA = 'NO TEAM';
+  } else if (ovQ2.teamAId && teamsById.has(ovQ2.teamAId)) {
+    q2TeamA = teamsById.get(ovQ2.teamAId);
+    q2SeedA = ovQ2.seedLabelA || q2TeamA.name;
+  } else if (loserQ1) {
+    q2TeamA = loserQ1;
+    q2SeedA = `Loser Q1: ${loserQ1.name}`;
+  } else {
+    q2TeamA = null;
+    q2SeedA = 'Loser Qualifier 1';
+  }
+
+  let q2TeamB: any = null;
+  let q2SeedB: string | null = null;
+  if (ovQ2.teamBId === 'NO_TEAM') {
+    q2TeamB = null;
+    q2SeedB = 'NO TEAM';
+  } else if (ovQ2.teamBId && teamsById.has(ovQ2.teamBId)) {
+    q2TeamB = teamsById.get(ovQ2.teamBId);
+    q2SeedB = ovQ2.seedLabelB || q2TeamB.name;
+  } else if (winnerElim) {
+    q2TeamB = winnerElim;
+    q2SeedB = `Winner Eliminator: ${winnerElim.name}`;
+  } else {
+    q2TeamB = null;
+    q2SeedB = 'Winner Eliminator';
+  }
+
+  const q2ScoreA = ovQ2.teamAScore ?? 0;
+  const q2ScoreB = ovQ2.teamBScore ?? 0;
+  const q2Status = ovQ2.status || 'UPCOMING';
+  let winnerQ2: any = null;
+  let loserQ2: any = null;
+  if (q2Status === 'COMPLETED') {
+    if (q2ScoreA > q2ScoreB) {
+      winnerQ2 = q2TeamA;
+      loserQ2 = q2TeamB;
+    } else if (q2ScoreB > q2ScoreA) {
+      winnerQ2 = q2TeamB;
+      loserQ2 = q2TeamA;
+    } else {
+      winnerQ2 = ovQ2.winnerId === q2TeamB?.id ? q2TeamB : q2TeamA;
+      loserQ2 = winnerQ2 === q2TeamA ? q2TeamB : q2TeamA;
+    }
+  }
+
+  // 4. FINAL (Winner Q1 vs Winner Q2)
+  const ovFinal = overrides['FINAL'] || {};
+  let finalTeamA: any = null;
+  let finalSeedA: string | null = null;
+  if (ovFinal.teamAId === 'NO_TEAM') {
+    finalTeamA = null;
+    finalSeedA = 'NO TEAM';
+  } else if (ovFinal.teamAId && teamsById.has(ovFinal.teamAId)) {
+    finalTeamA = teamsById.get(ovFinal.teamAId);
+    finalSeedA = ovFinal.seedLabelA || finalTeamA.name;
+  } else if (winnerQ1) {
+    finalTeamA = winnerQ1;
+    finalSeedA = `Winner Q1: ${winnerQ1.name}`;
+  } else {
+    finalTeamA = null;
+    finalSeedA = 'Winner Qualifier 1';
+  }
+
+  let finalTeamB: any = null;
+  let finalSeedB: string | null = null;
+  if (ovFinal.teamBId === 'NO_TEAM') {
+    finalTeamB = null;
+    finalSeedB = 'NO TEAM';
+  } else if (ovFinal.teamBId && teamsById.has(ovFinal.teamBId)) {
+    finalTeamB = teamsById.get(ovFinal.teamBId);
+    finalSeedB = ovFinal.seedLabelB || finalTeamB.name;
+  } else if (winnerQ2) {
+    finalTeamB = winnerQ2;
+    finalSeedB = `Winner Q2: ${winnerQ2.name}`;
+  } else {
+    finalTeamB = null;
+    finalSeedB = 'Winner Qualifier 2';
+  }
+
+  const finalScoreA = ovFinal.teamAScore ?? 0;
+  const finalScoreB = ovFinal.teamBScore ?? 0;
+  const finalStatus = ovFinal.status || 'UPCOMING';
+  let champion: any = null;
+  if (finalStatus === 'COMPLETED') {
+    if (finalScoreA > finalScoreB) {
+      champion = finalTeamA;
+    } else if (finalScoreB > finalScoreA) {
+      champion = finalTeamB;
+    } else {
+      champion = ovFinal.winnerId === finalTeamB?.id ? finalTeamB : finalTeamA;
+    }
+  }
+
+  const previewMatches = [
+    {
+      id: 'preview-q1',
+      stage: 'QUALIFIER_1',
+      bracketOrder: 1,
+      seedLabelA: q1SeedA,
+      seedLabelB: q1SeedB,
+      match: {
+        id: 'preview-q1-match',
+        matchNumber: baseNum,
+        teamAScore: q1ScoreA,
+        teamBScore: q1ScoreB,
+        time: '05:00 PM',
+        venue: 'Pitch 1 - Main Turf Arena',
+        status: q1Status,
+        winnerId: winnerQ1?.id || null,
+        teamA: q1TeamA,
+        teamB: q1TeamB,
+        events: [],
+      },
+    },
+    {
+      id: 'preview-elim',
+      stage: 'ELIMINATOR',
+      bracketOrder: 2,
+      seedLabelA: elimSeedA,
+      seedLabelB: elimSeedB,
+      match: {
+        id: 'preview-elim-match',
+        matchNumber: baseNum + 1,
+        teamAScore: elimScoreA,
+        teamBScore: elimScoreB,
+        time: '07:00 PM',
+        venue: 'Pitch 1 - Main Turf Arena',
+        status: elimStatus,
+        winnerId: winnerElim?.id || null,
+        teamA: elimTeamA,
+        teamB: elimTeamB,
+        events: [],
+      },
+    },
+    {
+      id: 'preview-q2',
+      stage: 'QUALIFIER_2',
+      bracketOrder: 3,
+      seedLabelA: q2SeedA,
+      seedLabelB: q2SeedB,
+      match: {
+        id: 'preview-q2-match',
+        matchNumber: baseNum + 2,
+        teamAScore: q2ScoreA,
+        teamBScore: q2ScoreB,
+        time: '06:00 PM',
+        venue: 'Pitch 1 - Main Turf Arena',
+        status: q2Status,
+        winnerId: winnerQ2?.id || null,
+        teamA: q2TeamA,
+        teamB: q2TeamB,
+        events: [],
+      },
+    },
+    {
+      id: 'preview-final',
+      stage: 'FINAL',
+      bracketOrder: 4,
+      seedLabelA: finalSeedA,
+      seedLabelB: finalSeedB,
+      match: {
+        id: 'preview-final-match',
+        matchNumber: baseNum + 3,
+        teamAScore: finalScoreA,
+        teamBScore: finalScoreB,
+        time: '08:00 PM',
+        venue: 'Pitch 1 - Grand Arena Amreli',
+        status: finalStatus,
+        winnerId: champion?.id || null,
+        teamA: finalTeamA,
+        teamB: finalTeamB,
+        events: [],
+      },
+    },
+  ];
+
+  return {
+    tournament,
+    leagueStatus,
+    isKnockoutActive: false,
+    isPreview: true,
+    knockoutMatches: previewMatches,
+  };
 }
 
 /**

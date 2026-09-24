@@ -74,7 +74,7 @@ export async function PUT(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { id, name, shortName, coach, description, primaryColor, logo } = body;
+    const { id, name, shortName, coach, description, primaryColor, logo, qualificationStatus } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'Team ID is required.' }, { status: 400 });
@@ -89,6 +89,9 @@ export async function PUT(req: NextRequest) {
         description: description !== undefined ? description?.trim() : undefined,
         primaryColor: primaryColor || undefined,
         logo: logo !== undefined ? (logo && logo.trim() ? logo.trim() : null) : undefined,
+        qualificationStatus: qualificationStatus !== undefined
+          ? (qualificationStatus && String(qualificationStatus).trim() ? String(qualificationStatus).trim().toUpperCase() : null)
+          : undefined,
       },
     });
 

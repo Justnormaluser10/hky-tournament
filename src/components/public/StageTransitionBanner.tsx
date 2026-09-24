@@ -24,6 +24,9 @@ export function StageTransitionBanner({
         currentStage === 'UPCOMING',
       completed:
         currentStage === 'KNOCKOUT' ||
+        currentStage === 'QUALIFIER_1' ||
+        currentStage === 'ELIMINATOR' ||
+        currentStage === 'QUALIFIER_2' ||
         currentStage === 'QUARTER_FINALS' ||
         currentStage === 'SEMI_FINALS' ||
         currentStage === 'FINAL' ||
@@ -35,6 +38,9 @@ export function StageTransitionBanner({
       sub: `Top ${qualificationCount} Teams`,
       active:
         currentStage === 'KNOCKOUT' ||
+        currentStage === 'QUALIFIER_1' ||
+        currentStage === 'ELIMINATOR' ||
+        currentStage === 'QUALIFIER_2' ||
         currentStage === 'QUARTER_FINALS' ||
         currentStage === 'SEMI_FINALS' ||
         currentStage === 'FINAL',
@@ -57,6 +63,12 @@ export function StageTransitionBanner({
       case 'LEAGUE_COMPLETE':
       case 'LEAGUE_COMPLETED':
         return 'League Stage Complete — Awaiting Knockout Activation';
+      case 'QUALIFIER_1':
+        return 'Qualifier 1 Active (Top 2 Battle for Final)';
+      case 'ELIMINATOR':
+        return 'Eliminator Active (Do-or-Die Match)';
+      case 'QUALIFIER_2':
+        return 'Qualifier 2 Active (Finals Decider)';
       case 'SEMI_FINALS':
       case 'QUARTER_FINALS':
       case 'KNOCKOUT':

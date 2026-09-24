@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdmin } from '@/lib/adminGuard';
 import { logActivity } from '@/lib/activity';
-import { checkLeagueStageStatus, generateKnockoutStages, advanceKnockoutWinner } from '@/lib/engine';
+import { checkLeagueStageStatus, generateKnockoutStages, advanceKnockoutWinner, getKnockoutData } from '@/lib/engine';
+import { saveKnockoutOverride, getKnockoutOverrides } from '@/lib/knockoutOverrides';
 
 export async function GET(req: NextRequest) {
   const auth = requireAdmin(req);
@@ -43,10 +44,23 @@ export async function GET(req: NextRequest) {
           },
         },
       },
-      orderBy: [{ stage: 'desc' }, { bracketOrder: 'asc' }],
+      orderBy: { bracketOrder: 'asc' },
     });
 
-    return NextResponse.json({ knockoutMatches, tournament, leagueStatus, teams });
+    let previewMatches: any[] = [];
+    if (knockoutMatches.length === 0) {
+      const koData = await getKnockoutData(tournament.id);
+      previewMatches = koData.knockoutMatches;
+    }
+
+    return NextResponse.json({
+      knockoutMatches,
+      previewMatches,
+      isPreview: knockoutMatches.length === 0,
+      tournament,
+      leagueStatus,
+      teams,
+    });
   } catch (error: any) {
     return NextResponse.json({ error: 'Failed to fetch knockout data' }, { status: 500 });
   }
@@ -58,20 +72,87 @@ export async function PUT(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { knockoutMatchId, teamAId, teamBId } = body;
+    const { knockoutMatchId, teamAId, teamBId, teamAScore, teamBScore, status } = body;
 
     if (!knockoutMatchId) {
       return NextResponse.json({ error: 'Knockout Match ID is required.' }, { status: 400 });
     }
 
-    if (!teamAId || !teamBId) {
-      return NextResponse.json({ error: 'Both Team A and Team B must be selected.' }, { status: 400 });
+    const tournament = await prisma.tournament.findFirst();
+    if (!tournament) return NextResponse.json({ error: 'Tournament not found' }, { status: 404 });
+
+    // 1. PREVIEW MATCH HANDLING (When league is incomplete or knockouts not yet generated in DB)
+    if (knockoutMatchId.startsWith('preview-')) {
+      let stage = 'QUALIFIER_1';
+      if (knockoutMatchId.includes('elim')) stage = 'ELIMINATOR';
+      else if (knockoutMatchId.includes('q2')) stage = 'QUALIFIER_2';
+      else if (knockoutMatchId.includes('final')) stage = 'FINAL';
+
+      // Validation: Same team check
+      if (
+        teamAId &&
+        teamBId &&
+        teamAId !== 'NO_TEAM' &&
+        teamBId !== 'NO_TEAM' &&
+        teamAId === teamBId
+      ) {
+        return NextResponse.json(
+          { error: 'A team cannot play against itself. Please select two distinct teams.' },
+          { status: 400 }
+        );
+      }
+
+      const overrideData: any = {};
+
+      if (teamAId !== undefined) {
+        if (teamAId === 'NO_TEAM' || teamAId === '' || teamAId === null) {
+          overrideData.teamAId = 'NO_TEAM';
+          overrideData.seedLabelA = 'NO TEAM';
+          overrideData.isManualSeedA = true;
+        } else {
+          const teamA = await prisma.team.findUnique({ where: { id: teamAId } });
+          overrideData.teamAId = teamAId;
+          overrideData.seedLabelA = teamA ? teamA.name : 'Team A';
+          overrideData.isManualSeedA = true;
+        }
+      }
+
+      if (teamBId !== undefined) {
+        if (teamBId === 'NO_TEAM' || teamBId === '' || teamBId === null) {
+          overrideData.teamBId = 'NO_TEAM';
+          overrideData.seedLabelB = 'NO TEAM';
+          overrideData.isManualSeedB = true;
+        } else {
+          const teamB = await prisma.team.findUnique({ where: { id: teamBId } });
+          overrideData.teamBId = teamBId;
+          overrideData.seedLabelB = teamB ? teamB.name : 'Team B';
+          overrideData.isManualSeedB = true;
+        }
+      }
+
+      if (teamAScore !== undefined) overrideData.teamAScore = Number(teamAScore);
+      if (teamBScore !== undefined) overrideData.teamBScore = Number(teamBScore);
+      if (status !== undefined) overrideData.status = status;
+
+      saveKnockoutOverride(stage, overrideData);
+
+      const koData = await getKnockoutData(tournament.id);
+      const updatedKoMatch = koData.knockoutMatches.find((k: any) => k.stage === stage);
+
+      await logActivity(
+        auth.admin.email,
+        'EDIT_KNOCKOUT_PREVIEW',
+        `Updated Projected Playoff ${stage}: ${updatedKoMatch?.match?.teamA?.name || updatedKoMatch?.seedLabelA || 'TBD'} vs ${updatedKoMatch?.match?.teamB?.name || updatedKoMatch?.seedLabelB || 'TBD'}`
+      );
+
+      return NextResponse.json({
+        success: true,
+        isPreview: true,
+        knockoutMatch: updatedKoMatch,
+      });
     }
 
-    if (teamAId === teamBId) {
-      return NextResponse.json({ error: 'A team cannot play against itself.' }, { status: 400 });
-    }
-
+    // 2. REAL DATABASE KNOCKOUT MATCH HANDLING
     const knockoutMatch = await prisma.knockoutMatch.findUnique({
       where: { id: knockoutMatchId },
       include: { match: true },
@@ -81,56 +162,91 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Knockout match not found.' }, { status: 404 });
     }
 
-    const teamA = await prisma.team.findUnique({ where: { id: teamAId } });
-    const teamB = await prisma.team.findUnique({ where: { id: teamBId } });
-
-    if (!teamA || !teamB) {
-      return NextResponse.json({ error: 'One or both selected teams could not be found.' }, { status: 404 });
-    }
-
-    let winnerId = knockoutMatch.match.winnerId;
-    if (winnerId && winnerId !== teamAId && winnerId !== teamBId) {
-      if (knockoutMatch.match.teamAScore > knockoutMatch.match.teamBScore) {
-        winnerId = teamAId;
-      } else if (knockoutMatch.match.teamBScore > knockoutMatch.match.teamAScore) {
-        winnerId = teamBId;
+    // Determine final team A
+    let finalTeamAId: string | null = knockoutMatch.match.teamAId;
+    let finalSeedLabelA: string | null = knockoutMatch.seedLabelA;
+    if (teamAId !== undefined) {
+      if (teamAId === 'NO_TEAM' || teamAId === '' || teamAId === null) {
+        finalTeamAId = null;
+        finalSeedLabelA = 'NO TEAM';
       } else {
-        winnerId = null;
+        const teamA = await prisma.team.findUnique({ where: { id: teamAId } });
+        finalTeamAId = teamA ? teamA.id : null;
+        finalSeedLabelA = teamA ? teamA.name : knockoutMatch.seedLabelA;
       }
     }
+
+    // Determine final team B
+    let finalTeamBId: string | null = knockoutMatch.match.teamBId;
+    let finalSeedLabelB: string | null = knockoutMatch.seedLabelB;
+    if (teamBId !== undefined) {
+      if (teamBId === 'NO_TEAM' || teamBId === '' || teamBId === null) {
+        finalTeamBId = null;
+        finalSeedLabelB = 'NO TEAM';
+      } else {
+        const teamB = await prisma.team.findUnique({ where: { id: teamBId } });
+        finalTeamBId = teamB ? teamB.id : null;
+        finalSeedLabelB = teamB ? teamB.name : knockoutMatch.seedLabelB;
+      }
+    }
+
+    // Same-team check (only applies if both are real teams)
+    if (finalTeamAId && finalTeamBId && finalTeamAId === finalTeamBId) {
+      return NextResponse.json({ error: 'A team cannot play against itself. Please select two distinct teams.' }, { status: 400 });
+    }
+
+    const newScoreA = teamAScore !== undefined ? Number(teamAScore) : knockoutMatch.match.teamAScore;
+    const newScoreB = teamBScore !== undefined ? Number(teamBScore) : knockoutMatch.match.teamBScore;
+    const newStatus = status !== undefined ? status : knockoutMatch.match.status;
+
+    let winnerId: string | null = null;
+    if (newStatus === 'COMPLETED') {
+      if (newScoreA > newScoreB) {
+        winnerId = finalTeamAId;
+      } else if (newScoreB > newScoreA) {
+        winnerId = finalTeamBId;
+      } else {
+        winnerId = knockoutMatch.match.winnerId || finalTeamAId;
+      }
+    }
+
+    const teamsChanged =
+      (teamAId !== undefined && teamAId !== knockoutMatch.match.teamAId) ||
+      (teamBId !== undefined && teamBId !== knockoutMatch.match.teamBId);
 
     const updatedMatch = await prisma.match.update({
       where: { id: knockoutMatch.matchId },
       data: {
-        teamAId,
-        teamBId,
+        teamAId: finalTeamAId,
+        teamBId: finalTeamBId,
+        teamAScore: newScoreA,
+        teamBScore: newScoreB,
+        status: newStatus,
         winnerId,
-        notes: knockoutMatch.match.notes
-          ? `${knockoutMatch.match.notes.replace(/\s*\[MANUAL_SEED\].*$/, '')} [MANUAL_SEED]`
-          : `[MANUAL_SEED] Custom fixture: ${teamA.name} vs ${teamB.name}`,
+        notes: teamsChanged
+          ? `${(knockoutMatch.match.notes || '').replace(/\s*\[MANUAL_SEED\].*$/, '')} [MANUAL_SEED]`
+          : undefined,
       },
     });
 
     const updatedKnockout = await prisma.knockoutMatch.update({
       where: { id: knockoutMatchId },
       data: {
-        seedLabelA: teamA.name,
-        seedLabelB: teamB.name,
+        seedLabelA: finalSeedLabelA,
+        seedLabelB: finalSeedLabelB,
       },
     });
 
-    if (updatedMatch.status === 'COMPLETED') {
-      try {
-        await advanceKnockoutWinner(updatedMatch.id);
-      } catch (e) {
-        console.warn('Knockout progression warning:', e);
-      }
+    try {
+      await advanceKnockoutWinner(updatedMatch.id);
+    } catch (e) {
+      console.warn('Knockout progression warning:', e);
     }
 
     await logActivity(
       auth.admin.email,
-      'EDIT_KNOCKOUT_TEAMS',
-      `Updated teams for Match #${knockoutMatch.match.matchNumber} (${knockoutMatch.stage}): ${teamA.name} vs ${teamB.name}`
+      'EDIT_KNOCKOUT_MATCH',
+      `Updated Match #${knockoutMatch.match.matchNumber} (${knockoutMatch.stage}): ${finalSeedLabelA || 'TBD'} vs ${finalSeedLabelB || 'TBD'} (Score: ${newScoreA}-${newScoreB}, Status: ${newStatus})`
     );
 
     return NextResponse.json({
@@ -140,7 +256,7 @@ export async function PUT(req: NextRequest) {
     });
   } catch (error: any) {
     console.error('Error updating knockout match teams:', error);
-    return NextResponse.json({ error: error.message || 'Failed to update knockout teams' }, { status: 500 });
+    return NextResponse.json({ error: error.message || 'Failed to update knockout match' }, { status: 500 });
   }
 }
 

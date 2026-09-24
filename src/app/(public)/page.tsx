@@ -21,6 +21,7 @@ import {
   calculateBestDefenders,
   calculateManOfTheMatches,
   checkLeagueStageStatus,
+  getKnockoutData,
 } from '@/lib/engine';
 import { TeamLogo } from '@/components/ui/TeamLogo';
 import { SportsAvatar } from '@/components/ui/SportsAvatar';
@@ -35,7 +36,7 @@ export default async function HomePage() {
   let currentStage = tournament?.currentStage || 'LEAGUE';
   const qualificationCount = tournament?.qualificationCount || 4;
 
-  const [leagueStatus, standingsResult, topScorers, topGoalkeepers, bestDefenders, manOfTheMatches] =
+  const [leagueStatus, standingsResult, topScorers, topGoalkeepers, bestDefenders, manOfTheMatches, knockoutData] =
     await Promise.all([
       checkLeagueStageStatus(tournament?.id),
       calculateStandings(tournament?.id),
@@ -43,6 +44,7 @@ export default async function HomePage() {
       calculateTopGoalkeepers(tournament?.id),
       calculateBestDefenders(tournament?.id),
       calculateManOfTheMatches(tournament?.id),
+      getKnockoutData(tournament?.id),
     ]);
 
   const standings = standingsResult.standings;
@@ -87,87 +89,17 @@ export default async function HomePage() {
     orderBy: { updatedAt: 'desc' },
   });
 
-  // Knockout stage can ONLY be active if:
-  // 1. League stage is 100% complete
-  // 2. Knockout fixtures have been generated and exist
-  // 3. Current stage is set to a playoff/final/completed stage
-  const knockoutMatchesRaw =
-    leagueStatus.isComplete &&
-    [
-      'KNOCKOUT',
-      'QUARTER_FINALS',
-      'SEMI_FINALS',
-      'FINAL',
-      'COMPLETED',
-    ].includes(currentStage)
-      ? await prisma.knockoutMatch.findMany({
-          where: { match: { tournamentId: tournament?.id } },
-          include: {
-            match: {
-              include: {
-                teamA: true,
-                teamB: true,
-                events: {
-                  include: { player: true, team: true },
-                  orderBy: { minute: 'asc' },
-                },
-              },
-            },
-          },
-          orderBy: [{ stage: 'desc' }, { bracketOrder: 'asc' }],
-        })
-      : [];
-
-  const hasKnockoutStarted =
-    leagueStatus.isComplete &&
-    knockoutMatchesRaw.length > 0 &&
-    [
-      'KNOCKOUT',
-      'QUARTER_FINALS',
-      'SEMI_FINALS',
-      'FINAL',
-      'COMPLETED',
-    ].includes(currentStage);
-
-  const isKnockoutActive =
-    hasKnockoutStarted &&
-    (currentStage === 'KNOCKOUT' ||
-      currentStage === 'QUARTER_FINALS' ||
-      currentStage === 'SEMI_FINALS' ||
-      currentStage === 'FINAL');
-
-  const isCompleted = hasKnockoutStarted && currentStage === 'COMPLETED';
-  const isLeagueComplete = leagueStatus.isComplete && !hasKnockoutStarted;
-
-  // Format knockout matches
-  const knockoutMatches = knockoutMatchesRaw.map((k) => ({
-    id: k.id,
-    stage: k.stage,
-    bracketOrder: k.bracketOrder,
-    seedLabelA: k.seedLabelA,
-    seedLabelB: k.seedLabelB,
-    match: {
-      id: k.match.id,
-      matchNumber: k.match.matchNumber,
-      teamAScore: k.match.teamAScore,
-      teamBScore: k.match.teamBScore,
-      time: k.match.time,
-      venue: k.match.venue,
-      status: k.match.status,
-      winnerId: k.match.winnerId,
-      teamA: k.match.teamA,
-      teamB: k.match.teamB,
-      events: k.match.events,
-    },
-  }));
+  const knockoutMatches = knockoutData.knockoutMatches;
+  const isKnockoutActive = knockoutData.isKnockoutActive;
+  const isLeagueComplete = leagueStatus.isComplete;
 
   // Identify Champion if tournament is completed
   let championTeam = null;
   let runnerUpTeam = null;
   let finalScore = null;
 
-  const finalKnockout = knockoutMatches.find((k) => k.stage === 'FINAL');
-  if (finalKnockout && finalKnockout.match.status === 'COMPLETED' && finalKnockout.match.winnerId) {
+  const finalKnockout = knockoutMatches.find((k: any) => k.stage === 'FINAL');
+  if (finalKnockout && finalKnockout.match?.status === 'COMPLETED' && finalKnockout.match?.winnerId) {
     const winnerId = finalKnockout.match.winnerId;
     if (finalKnockout.match.teamA?.id === winnerId) {
       championTeam = finalKnockout.match.teamA;
@@ -181,6 +113,8 @@ export default async function HomePage() {
       teamBScore: finalKnockout.match.teamBScore,
     };
   }
+
+  const isCompleted = currentStage === 'COMPLETED' || (finalKnockout?.match?.status === 'COMPLETED' && !!finalKnockout?.match?.winnerId);
 
   // Active Teams for team showcase
   const teams = await prisma.team.findMany({
@@ -417,8 +351,8 @@ export default async function HomePage() {
         </div>
 
         {/* 5. DYNAMIC PRIMARY SECTION: LEAGUE TABLE vs KNOCKOUT BRACKET */}
-        {isKnockoutActive ? (
-          /* KNOCKOUT IS ACTIVE: RENDER PROMINENT KNOCKOUT BRACKET */
+        {isLeagueComplete ? (
+          /* LEAGUE COMPLETE: RENDER OFFICIAL IPL-STYLE KNOCKOUT BRACKET */
           <section className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
@@ -427,7 +361,7 @@ export default async function HomePage() {
                   <span>Playoff Knockout Bracket</span>
                 </h2>
                 <p className="text-xs text-slate-400">
-                  Single-elimination championship bracket for the Amreli Silver Stick Trophy
+                  IPL-style Top 4 Championship Playoff for the Amreli Silver Stick Trophy
                 </p>
               </div>
 
@@ -435,7 +369,7 @@ export default async function HomePage() {
                 href="/standings"
                 className="text-xs font-bold text-slate-400 hover:text-white flex items-center gap-1"
               >
-                <span>League Table</span>
+                <span>Full League Standings</span>
                 <ChevronRight className="w-3.5 h-3.5" />
               </Link>
             </div>
@@ -443,6 +377,7 @@ export default async function HomePage() {
             <KnockoutBracket
               knockoutMatches={knockoutMatches}
               currentStage={currentStage}
+              isPreview={knockoutData.isPreview}
             />
           </section>
         ) : (
@@ -451,15 +386,9 @@ export default async function HomePage() {
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight flex items-center gap-2">
-                  <span>{isLeagueComplete ? 'Final League Standings' : 'League Standings'}</span>
-                  <span
-                    className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                      isLeagueComplete
-                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                        : 'bg-emerald-500/20 text-emerald-400'
-                    }`}
-                  >
-                    {isLeagueComplete ? 'LEAGUE COMPLETE' : 'LIVE'}
+                  <span>League Standings</span>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400">
+                    LIVE
                   </span>
                 </h2>
                 <p className="text-xs text-slate-400">
@@ -471,7 +400,7 @@ export default async function HomePage() {
                 href="/standings"
                 className="text-xs font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1"
               >
-                <span>Full Table</span>
+                <span>Full Table & Bracket Preview</span>
                 <ChevronRight className="w-3.5 h-3.5" />
               </Link>
             </div>
@@ -500,7 +429,7 @@ export default async function HomePage() {
                         </td>
                       </tr>
                     ) : (
-                      standings.map((team) => {
+                      standings.map((team: any) => {
                         const isCutoff = team.position === qualificationCount;
                         const isQualified = team.position <= qualificationCount;
 
@@ -534,9 +463,27 @@ export default async function HomePage() {
                                     primaryColor={team.primaryColor}
                                     size="sm"
                                   />
-                                  <span className="font-bold text-white text-xs truncate max-w-[140px] sm:max-w-none">
-                                    {team.name}
-                                  </span>
+                                  <div className="flex items-center gap-1.5 truncate max-w-[140px] sm:max-w-none">
+                                    <span className="font-bold text-white text-xs truncate">
+                                      {team.name}
+                                    </span>
+                                    {team.qualificationStatus === 'Q' && (
+                                      <span
+                                        className="inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[9px] font-black bg-emerald-500/25 text-emerald-300 border border-emerald-500/50 shadow-sm shrink-0"
+                                        title="Qualified for Knockouts (Q)"
+                                      >
+                                        Q
+                                      </span>
+                                    )}
+                                    {team.qualificationStatus === 'E' && (
+                                      <span
+                                        className="inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[9px] font-black bg-rose-500/25 text-rose-300 border border-rose-500/50 shadow-sm shrink-0"
+                                        title="Eliminated (E)"
+                                      >
+                                        E
+                                      </span>
+                                    )}
+                                  </div>
                                 </Link>
                               </td>
                               <td className="py-3 px-2 text-center font-mono">{team.played}</td>
