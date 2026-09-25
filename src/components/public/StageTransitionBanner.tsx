@@ -27,6 +27,7 @@ export function StageTransitionBanner({
         currentStage === 'QUALIFIER_1' ||
         currentStage === 'ELIMINATOR' ||
         currentStage === 'QUALIFIER_2' ||
+        currentStage === 'HARDLINE' ||
         currentStage === 'QUARTER_FINALS' ||
         currentStage === 'SEMI_FINALS' ||
         currentStage === 'FINAL' ||
@@ -41,6 +42,7 @@ export function StageTransitionBanner({
         currentStage === 'QUALIFIER_1' ||
         currentStage === 'ELIMINATOR' ||
         currentStage === 'QUALIFIER_2' ||
+        currentStage === 'HARDLINE' ||
         currentStage === 'QUARTER_FINALS' ||
         currentStage === 'SEMI_FINALS' ||
         currentStage === 'FINAL',
@@ -69,6 +71,8 @@ export function StageTransitionBanner({
         return 'Eliminator Active (Do-or-Die Match)';
       case 'QUALIFIER_2':
         return 'Qualifier 2 Active (Finals Decider)';
+      case 'HARDLINE':
+        return 'Hardline 3rd Place Match Active';
       case 'SEMI_FINALS':
       case 'QUARTER_FINALS':
       case 'KNOCKOUT':
@@ -108,6 +112,10 @@ export function StageTransitionBanner({
                 currentStage === 'UPCOMING')) ||
             (st.id === 'KNOCKOUT' &&
               (currentStage === 'KNOCKOUT' ||
+                currentStage === 'QUALIFIER_1' ||
+                currentStage === 'ELIMINATOR' ||
+                currentStage === 'QUALIFIER_2' ||
+                currentStage === 'HARDLINE' ||
                 currentStage === 'QUARTER_FINALS' ||
                 currentStage === 'SEMI_FINALS' ||
                 currentStage === 'FINAL')) ||

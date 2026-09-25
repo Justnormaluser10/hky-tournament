@@ -12,6 +12,9 @@ export interface KnockoutOverrideData {
   winnerId?: string | null;
   isManualSeedA?: boolean;
   isManualSeedB?: boolean;
+  date?: string | null;
+  time?: string | null;
+  scheduledAt?: string | null;
 }
 
 export type KnockoutOverridesMap = Record<string, KnockoutOverrideData>;

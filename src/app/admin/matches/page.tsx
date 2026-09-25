@@ -17,6 +17,12 @@ import {
   Check,
 } from 'lucide-react';
 import { TeamLogo } from '@/components/ui/TeamLogo';
+import {
+  formatMatchDate,
+  formatMatchTime,
+  toHtmlDateValue,
+  toHtmlTimeValue,
+} from '@/lib/dateUtils';
 
 interface MatchEvent {
   id: string;
@@ -40,6 +46,7 @@ interface Match {
   matchNumber: number;
   round: string;
   date: string;
+  scheduledAt?: string | null;
   time: string;
   venue: string;
   status: 'UPCOMING' | 'LIVE' | 'COMPLETED' | 'POSTPONED' | 'CANCELLED';
@@ -212,8 +219,8 @@ export default function AdminMatchesPage() {
     setScoreA(m.teamAScore);
     setScoreB(m.teamBScore);
     setMatchStatus(m.status);
-    setMatchDate(m.date ? new Date(m.date).toISOString().split('T')[0] : '');
-    setMatchTime(m.time);
+    setMatchDate(toHtmlDateValue(m.scheduledAt || m.date || ''));
+    setMatchTime(toHtmlTimeValue(m.time || '17:30'));
     setMatchVenue(m.venue);
     setMatchNotes(m.notes || '');
     setEditBestDefenderId(m.bestDefenderId || '');
@@ -274,7 +281,7 @@ export default function AdminMatchesPage() {
           teamAScore: Number(scoreA),
           teamBScore: Number(scoreB),
           status: matchStatus,
-          date: matchDate ? new Date(matchDate).toISOString() : undefined,
+          date: matchDate || null,
           time: matchTime,
           venue: matchVenue,
           notes: matchNotes,
@@ -734,14 +741,25 @@ export default function AdminMatchesPage() {
                 )}
 
                 {/* Footer and Edit Score CTA */}
-                <div className="pt-3 border-t border-white/10 flex items-center justify-between text-xs">
-                  <div className="text-xs text-slate-200 font-semibold truncate max-w-[60%]">
-                    {m.time} • {m.venue}
+                <div className="pt-3 border-t border-white/10 flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <div className="text-xs text-slate-300 font-semibold flex items-center gap-1.5 truncate">
+                    <Calendar className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    <span className="font-mono text-[11px] text-slate-200">
+                      {m.scheduledAt
+                        ? formatMatchDate(m.scheduledAt)
+                        : (m.round === 'KNOCKOUT' ? 'Date TBA' : formatMatchDate(m.date))}
+                    </span>
+                    <span>•</span>
+                    <span className="font-mono text-[11px] text-emerald-400 font-bold">
+                      {formatMatchTime(m.time) || m.time}
+                    </span>
+                    <span>•</span>
+                    <span className="truncate max-w-[120px] text-slate-400">{m.venue}</span>
                   </div>
 
                   <button
                     onClick={() => openScoreModal(m)}
-                    className="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-300 hover:text-white border border-emerald-400/50 hover:border-emerald-300 font-extrabold uppercase tracking-wider text-[11px] transition-all flex items-center gap-1.5 shadow-sm"
+                    className="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-300 hover:text-white border border-emerald-400/50 hover:border-emerald-300 font-extrabold uppercase tracking-wider text-[11px] transition-all flex items-center gap-1.5 shadow-sm ml-auto"
                   >
                     <Edit2 className="w-3 h-3 text-emerald-400" />
                     <span>Edit Match & Events</span>
@@ -1402,6 +1420,7 @@ export default function AdminMatchesPage() {
                     <option value="QUALIFIER_1">QUALIFIER_1</option>
                     <option value="ELIMINATOR">ELIMINATOR</option>
                     <option value="QUALIFIER_2">QUALIFIER_2</option>
+                    <option value="HARDLINE">HARDLINE (3rd Place)</option>
                     <option value="FINAL">FINAL</option>
                   </select>
                 </div>

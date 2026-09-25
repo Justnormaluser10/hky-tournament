@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Calendar, Clock, MapPin, Filter, Trophy, X, Flame } from 'lucide-react';
 import { TeamLogo } from '@/components/ui/TeamLogo';
+import { formatMatchDate, formatMatchTime } from '@/lib/dateUtils';
 
 interface MatchEvent {
   id: string;
@@ -25,6 +26,7 @@ interface Match {
   matchNumber: number;
   round: string;
   date: string;
+  scheduledAt?: string | null;
   time: string;
   venue: string;
   status: 'UPCOMING' | 'LIVE' | 'COMPLETED' | 'POSTPONED' | 'CANCELLED';
@@ -123,6 +125,7 @@ export default function MatchesPage() {
     { label: 'Qualifier 1', value: 'QUALIFIER_1' },
     { label: 'Eliminator', value: 'ELIMINATOR' },
     { label: 'Qualifier 2', value: 'QUALIFIER_2' },
+    { label: 'Hardline (3rd Place)', value: 'HARDLINE' },
     { label: 'Final', value: 'FINAL' },
   ];
 
@@ -133,20 +136,30 @@ export default function MatchesPage() {
     matches.forEach((match) => {
       let dateKey = '9999-99-99';
       let dateObj = new Date(8640000000000000);
-      let displayDate = 'To Be Announced';
+      let displayDate = 'To Be Announced (TBA)';
 
-      if (match.date) {
-        const d = new Date(match.date);
+      const isKnockout = match.round === 'KNOCKOUT' || Boolean(match.knockout);
+      const effectiveDate = isKnockout ? match.scheduledAt : (match.scheduledAt || match.date);
+
+      if (effectiveDate) {
+        const d = new Date(effectiveDate);
         if (!isNaN(d.getTime())) {
-          const year = d.getFullYear();
-          const month = String(d.getMonth() + 1).padStart(2, '0');
-          const day = String(d.getDate()).padStart(2, '0');
-          dateKey = `${year}-${month}-${day}`;
           dateObj = d;
-
-          const dayNum = d.getDate();
-          const monthName = d.toLocaleDateString('en-US', { month: 'long' });
-          displayDate = `${dayNum} ${monthName} ${year}`;
+          displayDate = formatMatchDate(effectiveDate);
+          try {
+            const formatter = new Intl.DateTimeFormat('en-CA', {
+              timeZone: 'Asia/Kolkata',
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+            });
+            dateKey = formatter.format(d);
+          } catch {
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            dateKey = `${year}-${month}-${day}`;
+          }
         }
       }
 
@@ -313,8 +326,8 @@ export default function MatchesPage() {
                                 LIVE NOW
                               </span>
                             ) : (
-                              <span className="px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 text-[10px] font-bold uppercase tracking-wider border border-white/10">
-                                {match.time}
+                              <span className="px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 text-[10px] font-bold uppercase tracking-wider border border-white/10 font-mono">
+                                {formatMatchTime(match.time) || match.time}
                               </span>
                             )}
                           </div>

@@ -108,7 +108,7 @@ export default function AdminStandingsPage() {
 
   const openEditModal = (row: StandingRow) => {
     setEditRow(row);
-    setPosInput(String(row.position));
+    setPosInput('');
     setPInput(row.played);
     setWInput(row.won);
     setDInput(row.drawn);

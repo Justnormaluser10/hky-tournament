@@ -74,6 +74,7 @@ export function TournamentProgressionCard({
     tournament.currentStage === 'QUALIFIER_1' ||
     tournament.currentStage === 'ELIMINATOR' ||
     tournament.currentStage === 'QUALIFIER_2' ||
+    tournament.currentStage === 'HARDLINE' ||
     tournament.currentStage === 'QUARTER_FINALS' ||
     tournament.currentStage === 'SEMI_FINALS' ||
     tournament.currentStage === 'FINAL';

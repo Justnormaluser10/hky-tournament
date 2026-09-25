@@ -4,6 +4,7 @@ import { requireAdmin } from '@/lib/adminGuard';
 import { logActivity } from '@/lib/activity';
 import { checkLeagueStageStatus, generateKnockoutStages, advanceKnockoutWinner, getKnockoutData } from '@/lib/engine';
 import { saveKnockoutOverride, getKnockoutOverrides } from '@/lib/knockoutOverrides';
+import { parseIstDate, formatMatchTime, formatMatchDate } from '@/lib/dateUtils';
 
 export async function GET(req: NextRequest) {
   const auth = requireAdmin(req);
@@ -72,7 +73,7 @@ export async function PUT(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { knockoutMatchId, teamAId, teamBId, teamAScore, teamBScore, status } = body;
+    const { knockoutMatchId, teamAId, teamBId, teamAScore, teamBScore, status, date, time } = body;
 
     if (!knockoutMatchId) {
       return NextResponse.json({ error: 'Knockout Match ID is required.' }, { status: 400 });
@@ -86,6 +87,7 @@ export async function PUT(req: NextRequest) {
       let stage = 'QUALIFIER_1';
       if (knockoutMatchId.includes('elim')) stage = 'ELIMINATOR';
       else if (knockoutMatchId.includes('q2')) stage = 'QUALIFIER_2';
+      else if (knockoutMatchId.includes('hardline')) stage = 'HARDLINE';
       else if (knockoutMatchId.includes('final')) stage = 'FINAL';
 
       // Validation: Same team check
@@ -134,6 +136,20 @@ export async function PUT(req: NextRequest) {
       if (teamBScore !== undefined) overrideData.teamBScore = Number(teamBScore);
       if (status !== undefined) overrideData.status = status;
 
+      if (date !== undefined) {
+        if (!date || date === 'NOT_SET' || date === null) {
+          overrideData.scheduledAt = null;
+          overrideData.date = null;
+        } else {
+          const parsed = parseIstDate(date, time);
+          overrideData.scheduledAt = parsed.toISOString();
+          overrideData.date = parsed.toISOString();
+        }
+      }
+      if (time !== undefined) {
+        overrideData.time = time ? formatMatchTime(time) : undefined;
+      }
+
       saveKnockoutOverride(stage, overrideData);
 
       const koData = await getKnockoutData(tournament.id);
@@ -142,7 +158,9 @@ export async function PUT(req: NextRequest) {
       await logActivity(
         auth.admin.email,
         'EDIT_KNOCKOUT_PREVIEW',
-        `Updated Projected Playoff ${stage}: ${updatedKoMatch?.match?.teamA?.name || updatedKoMatch?.seedLabelA || 'TBD'} vs ${updatedKoMatch?.match?.teamB?.name || updatedKoMatch?.seedLabelB || 'TBD'}`
+        date !== undefined || time !== undefined
+          ? `Updated Schedule for Projected Playoff ${stage}: Date: ${formatMatchDate(overrideData.scheduledAt) || 'Not set'}, Time: ${overrideData.time || 'Not set'}`
+          : `Updated Projected Playoff ${stage}: ${updatedKoMatch?.match?.teamA?.name || updatedKoMatch?.seedLabelA || 'TBD'} vs ${updatedKoMatch?.match?.teamB?.name || updatedKoMatch?.seedLabelB || 'TBD'}`
       );
 
       return NextResponse.json({
@@ -214,6 +232,20 @@ export async function PUT(req: NextRequest) {
       (teamAId !== undefined && teamAId !== knockoutMatch.match.teamAId) ||
       (teamBId !== undefined && teamBId !== knockoutMatch.match.teamBId);
 
+    let newScheduledAt: Date | null | undefined = undefined;
+    if (date !== undefined) {
+      if (!date || date === 'NOT_SET' || date === null) {
+        newScheduledAt = null;
+      } else {
+        newScheduledAt = parseIstDate(date, time !== undefined ? time : knockoutMatch.match.time);
+      }
+    }
+
+    let newTime: string | undefined = undefined;
+    if (time !== undefined) {
+      newTime = time ? formatMatchTime(time) : knockoutMatch.match.time;
+    }
+
     const updatedMatch = await prisma.match.update({
       where: { id: knockoutMatch.matchId },
       data: {
@@ -223,6 +255,9 @@ export async function PUT(req: NextRequest) {
         teamBScore: newScoreB,
         status: newStatus,
         winnerId,
+        scheduledAt: newScheduledAt !== undefined ? newScheduledAt : undefined,
+        date: newScheduledAt ? newScheduledAt : undefined,
+        time: newTime !== undefined ? newTime : undefined,
         notes: teamsChanged
           ? `${(knockoutMatch.match.notes || '').replace(/\s*\[MANUAL_SEED\].*$/, '')} [MANUAL_SEED]`
           : undefined,
@@ -243,10 +278,13 @@ export async function PUT(req: NextRequest) {
       console.warn('Knockout progression warning:', e);
     }
 
+    const scheduleChanged = date !== undefined || time !== undefined;
     await logActivity(
       auth.admin.email,
       'EDIT_KNOCKOUT_MATCH',
-      `Updated Match #${knockoutMatch.match.matchNumber} (${knockoutMatch.stage}): ${finalSeedLabelA || 'TBD'} vs ${finalSeedLabelB || 'TBD'} (Score: ${newScoreA}-${newScoreB}, Status: ${newStatus})`
+      scheduleChanged
+        ? `Updated Schedule for Match #${knockoutMatch.match.matchNumber} (${knockoutMatch.stage}): Date: ${formatMatchDate(newScheduledAt) || 'Not set'}, Time: ${newTime || knockoutMatch.match.time}`
+        : `Updated Match #${knockoutMatch.match.matchNumber} (${knockoutMatch.stage}): ${finalSeedLabelA || 'TBD'} vs ${finalSeedLabelB || 'TBD'} (Score: ${newScoreA}-${newScoreB}, Status: ${newStatus})`
     );
 
     return NextResponse.json({

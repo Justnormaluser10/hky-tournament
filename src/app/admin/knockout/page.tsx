@@ -23,6 +23,12 @@ import {
 } from 'lucide-react';
 import { TeamLogo } from '@/components/ui/TeamLogo';
 import { KnockoutBracket, KnockoutMatchData } from '@/components/public/KnockoutBracket';
+import {
+  formatMatchDate,
+  formatMatchTime,
+  toHtmlDateValue,
+  toHtmlTimeValue,
+} from '@/lib/dateUtils';
 
 interface AvailableTeam {
   id: string;
@@ -42,6 +48,13 @@ export default function AdminKnockoutPage() {
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
+
+  // Edit Date Modal
+  const [editingDateMatch, setEditingDateMatch] = useState<KnockoutMatchData | null>(null);
+  const [inputMatchDate, setInputMatchDate] = useState<string>('');
+  const [inputMatchTime, setInputMatchTime] = useState<string>('');
+  const [savingDate, setSavingDate] = useState(false);
+  const [dateError, setDateError] = useState<string | null>(null);
 
   // Edit Teams Modal
   const [editingTeamsMatch, setEditingTeamsMatch] = useState<KnockoutMatchData | null>(null);
@@ -101,6 +114,97 @@ export default function AdminKnockoutPage() {
   useEffect(() => {
     fetchKnockout();
   }, []);
+
+  // Open Edit Date Editor
+  const handleOpenEditDate = (k: KnockoutMatchData) => {
+    setEditingDateMatch(k);
+    const m = k.match;
+    setInputMatchDate(toHtmlDateValue(m.scheduledAt || m.date || ''));
+    setInputMatchTime(toHtmlTimeValue(m.time || '18:00'));
+    setDateError(null);
+  };
+
+  // Save Scheduled Date & Time
+  const handleSaveDate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingDateMatch) return;
+
+    if (!inputMatchDate) {
+      setDateError('Please select a match date.');
+      return;
+    }
+
+    setSavingDate(true);
+    setDateError(null);
+    setActionSuccess(null);
+    setActionError(null);
+
+    try {
+      const res = await fetch('/api/admin/knockout', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          knockoutMatchId: editingDateMatch.id,
+          date: inputMatchDate,
+          time: inputMatchTime || '18:00',
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setDateError(data.error || 'Failed to update match schedule.');
+      } else {
+        const formattedDate = formatMatchDate(inputMatchDate);
+        const formattedTime = formatMatchTime(inputMatchTime || '18:00');
+        setActionSuccess(
+          `Schedule updated for Match #${editingDateMatch.match.matchNumber} (${editingDateMatch.stage.replace('_', ' ')}): ${formattedDate} at ${formattedTime}!`
+        );
+        setEditingDateMatch(null);
+        await fetchKnockout();
+      }
+    } catch (err) {
+      setDateError('An error occurred while saving the schedule.');
+    } finally {
+      setSavingDate(false);
+    }
+  };
+
+  // Clear / Remove Scheduled Date
+  const handleClearDate = async () => {
+    if (!editingDateMatch) return;
+
+    setSavingDate(true);
+    setDateError(null);
+    setActionSuccess(null);
+    setActionError(null);
+
+    try {
+      const res = await fetch('/api/admin/knockout', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          knockoutMatchId: editingDateMatch.id,
+          date: null,
+          time: inputMatchTime || null,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setDateError(data.error || 'Failed to clear match schedule.');
+      } else {
+        setActionSuccess(
+          `Schedule cleared for Match #${editingDateMatch.match.matchNumber} (${editingDateMatch.stage.replace('_', ' ')}).`
+        );
+        setEditingDateMatch(null);
+        await fetchKnockout();
+      }
+    } catch (err) {
+      setDateError('An error occurred while clearing the schedule.');
+    } finally {
+      setSavingDate(false);
+    }
+  };
 
   // Open Direct Teams Editor
   const handleOpenEditTeams = (k: KnockoutMatchData, slot?: 'A' | 'B') => {
@@ -402,7 +506,7 @@ export default function AdminKnockoutPage() {
               </div>
               <p className="text-slate-300 text-[11px] mt-0.5 leading-relaxed">
                 Knockout officially unlocks after all league matches are completed ({leagueStatus?.completedMatches || 0}/{leagueStatus?.expectedMatches || 15} finished).
-                The bracket below shows projected positions from current standings. You can directly edit teams (including &ldquo;NO TEAM&rdquo;), scores, and match settings.
+                The bracket below shows projected positions from current standings. You can directly edit teams (including &ldquo;NO TEAM&rdquo;), scores, dates, and match settings.
               </p>
             </div>
           </div>
@@ -421,7 +525,7 @@ export default function AdminKnockoutPage() {
                 OFFICIAL KNOCKOUT BRACKET UNLOCKED
               </span>
               <p className="text-slate-300 text-[11px] mt-0.5">
-                All league fixtures are completed. Changes to teams, scores, and progression update live across all public tournament pages.
+                All league fixtures are completed. Changes to teams, scores, dates, and progression update live across all public tournament pages.
               </p>
             </div>
           </div>
@@ -451,6 +555,7 @@ export default function AdminKnockoutPage() {
           onEditTeams={handleOpenEditTeams}
           onEditScore={handleOpenEditScore}
           onEditMatch={handleOpenEditMatch}
+          onEditDate={handleOpenEditDate}
         />
       </div>
 
@@ -745,6 +850,148 @@ export default function AdminKnockoutPage() {
                 >
                   {savingDetails ? 'Saving...' : 'Save Settings'}
                 </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 8. EDIT DATE & TIME MODAL */}
+      {editingDateMatch && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="w-full max-w-sm sm:max-w-md bg-slate-950 border border-white/15 rounded-3xl p-5 sm:p-6 shadow-2xl space-y-4 sm:space-y-5">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div>
+                <h3 className="font-black text-white uppercase text-sm sm:text-base flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-emerald-400" />
+                  <span>
+                    {editingDateMatch.match.scheduledAt ? 'Edit Match Date' : 'Set Match Date'}
+                  </span>
+                </h3>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="text-xs font-bold text-amber-300 font-mono">
+                    Match #{editingDateMatch.match.matchNumber}
+                  </span>
+                  <span className="text-[11px] text-slate-400 font-medium">
+                    • {editingDateMatch.stage.replace('_', ' ')}
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingDateMatch(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Teams Subheading */}
+            <div className="p-2.5 rounded-xl bg-slate-900/80 border border-white/5 flex items-center justify-between text-xs">
+              <span className="font-black text-white truncate max-w-[120px] sm:max-w-[150px]">
+                {editingDateMatch.match.teamA?.name || editingDateMatch.seedLabelA || 'TBD Qualifier'}
+              </span>
+              <span className="font-mono font-black text-amber-400 text-[10px] px-1.5 py-0.5 rounded bg-black/50">
+                VS
+              </span>
+              <span className="font-black text-white truncate max-w-[120px] sm:max-w-[150px] text-right">
+                {editingDateMatch.match.teamB?.name || editingDateMatch.seedLabelB || 'TBD Qualifier'}
+              </span>
+            </div>
+
+            {/* Current Schedule Status */}
+            <div className="text-[11px] text-slate-400 flex items-center gap-1.5 font-mono">
+              <span className="text-slate-500">Current:</span>
+              {editingDateMatch.match.scheduledAt ? (
+                <span className="text-emerald-300 font-bold">
+                  {formatMatchDate(editingDateMatch.match.scheduledAt)} at{' '}
+                  {formatMatchTime(editingDateMatch.match.time) || editingDateMatch.match.time}
+                </span>
+              ) : (
+                <span className="text-amber-400/90 italic">Scheduled date: Not set</span>
+              )}
+            </div>
+
+            {dateError && (
+              <div className="p-3 rounded-xl bg-rose-950/70 border border-rose-500/40 text-xs text-rose-300 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                <span>{dateError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveDate} className="space-y-4">
+              {/* Native Date Picker */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-black uppercase tracking-wider text-slate-200">
+                  Match Date <span className="text-rose-400">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="date"
+                    required
+                    value={inputMatchDate}
+                    onChange={(e) => setInputMatchDate(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-white/15 text-white text-xs sm:text-sm font-mono focus:border-emerald-500 focus:outline-none transition [color-scheme:dark]"
+                  />
+                </div>
+                {inputMatchDate && (
+                  <span className="text-[10px] text-emerald-400 font-mono block">
+                    ➔ Preview: {formatMatchDate(inputMatchDate)}
+                  </span>
+                )}
+              </div>
+
+              {/* Native Time Picker */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-black uppercase tracking-wider text-slate-200">
+                  Match Time
+                </label>
+                <div className="relative">
+                  <input
+                    type="time"
+                    value={inputMatchTime}
+                    onChange={(e) => setInputMatchTime(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-white/15 text-white text-xs sm:text-sm font-mono focus:border-emerald-500 focus:outline-none transition [color-scheme:dark]"
+                  />
+                </div>
+                {inputMatchTime && (
+                  <span className="text-[10px] text-emerald-400 font-mono block">
+                    ➔ Preview: {formatMatchTime(inputMatchTime)} (IST)
+                  </span>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="space-y-2 pt-1">
+                <div className="flex items-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setEditingDateMatch(null)}
+                    className="flex-1 py-2.5 px-3 rounded-xl bg-slate-900 text-slate-300 font-bold text-xs uppercase tracking-wider hover:bg-slate-800 transition border border-white/10"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={savingDate}
+                    className="flex-1 py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-black text-xs uppercase tracking-wider transition shadow-lg shadow-emerald-900/40 disabled:opacity-50"
+                  >
+                    {savingDate ? 'Saving...' : 'Save Date'}
+                  </button>
+                </div>
+
+                {/* Option to clear/remove scheduled date if one is currently set */}
+                {editingDateMatch.match.scheduledAt && (
+                  <button
+                    type="button"
+                    onClick={handleClearDate}
+                    disabled={savingDate}
+                    className="w-full py-2 px-3 rounded-xl bg-slate-900/60 hover:bg-rose-950/40 text-slate-400 hover:text-rose-300 font-semibold text-[11px] uppercase tracking-wider transition border border-white/5 hover:border-rose-500/30 text-center"
+                  >
+                    Remove / Clear Scheduled Date
+                  </button>
+                )}
               </div>
             </form>
           </div>

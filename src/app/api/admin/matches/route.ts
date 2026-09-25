@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { requireAdmin } from '@/lib/adminGuard';
 import { logActivity } from '@/lib/activity';
 import { syncKnockoutSeeds, advanceKnockoutWinner, checkLeagueStageStatus, generateKnockoutStages } from '@/lib/engine';
+import { parseIstDate } from '@/lib/dateUtils';
 
 export async function GET(req: NextRequest) {
   const auth = requireAdmin(req);
@@ -228,7 +229,16 @@ export async function PUT(req: NextRequest) {
         status: newStatus,
         winnerId,
         round: round || undefined,
-        date: date ? new Date(date) : undefined,
+        date: date
+          ? (typeof date === 'string' && date.match(/^\d{4}-\d{2}-\d{2}$/)
+              ? parseIstDate(date, time !== undefined ? time : currentMatch.time)
+              : new Date(date))
+          : undefined,
+        scheduledAt: date
+          ? (typeof date === 'string' && date.match(/^\d{4}-\d{2}-\d{2}$/)
+              ? parseIstDate(date, time !== undefined ? time : currentMatch.time)
+              : new Date(date))
+          : (date === null ? null : undefined),
         time: time !== undefined ? time : undefined,
         venue: venue !== undefined ? venue : undefined,
         notes: notes !== undefined ? notes : undefined,

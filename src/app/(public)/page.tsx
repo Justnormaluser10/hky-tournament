@@ -28,6 +28,7 @@ import { SportsAvatar } from '@/components/ui/SportsAvatar';
 import { KnockoutBracket } from '@/components/public/KnockoutBracket';
 import { ChampionCelebration } from '@/components/public/ChampionCelebration';
 import { StageTransitionBanner } from '@/components/public/StageTransitionBanner';
+import { formatMatchDate, formatMatchTime } from '@/lib/dateUtils';
 
 export const revalidate = 0; // Dynamic server-side rendering for fresh tournament scores
 
@@ -256,7 +257,8 @@ export default async function HomePage() {
 
                 <div className="py-2 px-3 rounded-xl bg-slate-950/60 border border-white/5 flex items-center justify-between text-xs text-slate-300">
                   <span className="font-mono font-bold text-emerald-400">
-                    {upcomingMatch.time}
+                    {upcomingMatch.scheduledAt ? `${formatMatchDate(upcomingMatch.scheduledAt)} • ` : ''}
+                    {formatMatchTime(upcomingMatch.time) || upcomingMatch.time}
                   </span>
                   <span className="truncate max-w-[180px] text-slate-400">
                     {upcomingMatch.venue}

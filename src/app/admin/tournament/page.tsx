@@ -235,6 +235,7 @@ export default function AdminTournamentConfigPage() {
                 <option value="QUALIFIER_1">QUALIFIER_1</option>
                 <option value="ELIMINATOR">ELIMINATOR</option>
                 <option value="QUALIFIER_2">QUALIFIER_2</option>
+                <option value="HARDLINE">HARDLINE (3rd Place)</option>
                 <option value="FINAL">FINAL</option>
                 <option value="COMPLETED">COMPLETED</option>
               </select>

@@ -209,65 +209,33 @@ export async function calculateStandings(tournamentId?: string): Promise<{
     }
   }
 
-  let hasExplicitPositionOverride = false;
-
   const rows = Object.values(statsMap).map((row) => {
     row.goalDifference = row.goalsFor - row.goalsAgainst;
     row.form = row.form.slice(-5);
 
     const ov = overrideMap.get(row.teamId);
-    if (ov) {
+    if (ov && ov.notes) {
       row.isOverridden = true;
       row.overrideNotes = ov.notes;
-      if (ov.played !== null && ov.played !== undefined) row.played = ov.played;
-      if (ov.won !== null && ov.won !== undefined) row.won = ov.won;
-      if (ov.drawn !== null && ov.drawn !== undefined) row.drawn = ov.drawn;
-      if (ov.lost !== null && ov.lost !== undefined) row.lost = ov.lost;
-      if (ov.goalsFor !== null && ov.goalsFor !== undefined) row.goalsFor = ov.goalsFor;
-      if (ov.goalsAgainst !== null && ov.goalsAgainst !== undefined) row.goalsAgainst = ov.goalsAgainst;
-      if (ov.goalDifference !== null && ov.goalDifference !== undefined) {
-        row.goalDifference = ov.goalDifference;
-      } else {
-        row.goalDifference = row.goalsFor - row.goalsAgainst;
-      }
-      if (ov.points !== null && ov.points !== undefined) row.points = ov.points;
-      if (ov.position !== null && ov.position !== undefined && ov.position > 0) {
-        row.position = ov.position;
-        hasExplicitPositionOverride = true;
-      }
     }
 
     return row;
   });
 
-  // Sort by Points DESC, GD DESC, GF DESC, Wins DESC, Name ASC
-  // If an administrator set explicit positions, sort by those positions first
-  if (hasExplicitPositionOverride) {
-    rows.sort((a, b) => {
-      const posA = a.position > 0 ? a.position : 9999;
-      const posB = b.position > 0 ? b.position : 9999;
-      if (posA !== posB) return posA - posB;
-      if (b.points !== a.points) return b.points - a.points;
-      if (b.goalDifference !== a.goalDifference) return b.goalDifference - a.goalDifference;
-      if (b.goalsFor !== a.goalsFor) return b.goalsFor - a.goalsFor;
-      if (b.won !== a.won) return b.won - a.won;
-      return a.name.localeCompare(b.name);
-    });
-  } else {
-    rows.sort((a, b) => {
-      if (b.points !== a.points) return b.points - a.points;
-      if (b.goalDifference !== a.goalDifference) return b.goalDifference - a.goalDifference;
-      if (b.goalsFor !== a.goalsFor) return b.goalsFor - a.goalsFor;
-      if (b.won !== a.won) return b.won - a.won;
-      return a.name.localeCompare(b.name);
-    });
-  }
+  // Sort by existing tournament tie-break rules:
+  // Points DESC, GD DESC, GF DESC, Wins DESC, Name ASC
+  rows.sort((a, b) => {
+    if (b.points !== a.points) return b.points - a.points;
+    if (b.goalDifference !== a.goalDifference) return b.goalDifference - a.goalDifference;
+    if (b.goalsFor !== a.goalsFor) return b.goalsFor - a.goalsFor;
+    if (b.won !== a.won) return b.won - a.won;
+    return a.name.localeCompare(b.name);
+  });
 
+  // Assign sequential positions strictly based on tie-break sorted order
   const qualificationCount = tournament.qualificationCount || 4;
   rows.forEach((r, idx) => {
-    if (!hasExplicitPositionOverride || r.position <= 0) {
-      r.position = idx + 1;
-    }
+    r.position = idx + 1;
     r.isQualified = r.position <= qualificationCount;
   });
 
@@ -522,7 +490,7 @@ export async function generateKnockoutStages(tournamentId: string): Promise<{
         venue: 'Pitch 1 - Main Turf Arena',
         time: '06:00 PM',
         status: 'UPCOMING',
-        notes: 'Qualifier 2: Loser Qualifier 1 vs Winner Eliminator [Winner to Final, Loser Eliminated]',
+        notes: 'Qualifier 2: Loser Qualifier 1 vs Winner Eliminator [Winner to Final, Loser to Hardline 3rd Place Match]',
       },
     });
 
@@ -536,7 +504,32 @@ export async function generateKnockoutStages(tournamentId: string): Promise<{
       },
     });
 
-    // 4. FINAL: Winner of Qualifier 1 vs Winner of Qualifier 2
+    // 4. HARDLINE: 3rd Place Match (Loser Eliminator vs Loser Qualifier 2)
+    const hardlineMatch = await prisma.match.create({
+      data: {
+        tournamentId: tournament.id,
+        round: 'HARDLINE',
+        matchNumber: matchCounter++,
+        teamAId: null, // Placeholder: Loser Eliminator
+        teamBId: null, // Placeholder: Loser Qualifier 2
+        venue: 'Pitch 1 - Main Turf Arena',
+        time: '07:30 PM',
+        status: 'UPCOMING',
+        notes: '3rd Place Match / Hardline: Loser Eliminator vs Loser Qualifier 2 [Winner to 3rd Place, Loser to 4th Place]',
+      },
+    });
+
+    await prisma.knockoutMatch.create({
+      data: {
+        stage: 'HARDLINE',
+        matchId: hardlineMatch.id,
+        bracketOrder: 4,
+        seedLabelA: 'Loser Eliminator',
+        seedLabelB: 'Loser Qualifier 2',
+      },
+    });
+
+    // 5. FINAL: Winner of Qualifier 1 vs Winner of Qualifier 2
     const finalMatch = await prisma.match.create({
       data: {
         tournamentId: tournament.id,
@@ -545,7 +538,7 @@ export async function generateKnockoutStages(tournamentId: string): Promise<{
         teamAId: null, // Placeholder: Winner of Qualifier 1
         teamBId: null, // Placeholder: Winner of Qualifier 2
         venue: 'Pitch 1 - Grand Arena Amreli',
-        time: '08:00 PM',
+        time: '08:30 PM',
         status: 'UPCOMING',
         notes: 'Grand Championship Final for the Amreli Silver Stick Trophy',
       },
@@ -555,13 +548,13 @@ export async function generateKnockoutStages(tournamentId: string): Promise<{
       data: {
         stage: 'FINAL',
         matchId: finalMatch.id,
-        bracketOrder: 4,
+        bracketOrder: 5,
         seedLabelA: 'Winner Qualifier 1',
         seedLabelB: 'Winner Qualifier 2',
       },
     });
 
-    createdCount = 4;
+    createdCount = 5;
   } else if (qualificationCount === 8) {
     // Top 8: Quarter-Finals -> Semi-Finals -> Final
     const pairs = [
@@ -742,6 +735,7 @@ export async function advanceKnockoutWinner(matchId: string) {
   });
 
   const q2Knockout = allKnockouts.find((k) => k.stage === 'QUALIFIER_2');
+  const hardlineKnockout = allKnockouts.find((k) => k.stage === 'HARDLINE');
   const finalKnockout = allKnockouts.find((k) => k.stage === 'FINAL');
 
   // 1. QUALIFIER 1 Progression:
@@ -795,7 +789,7 @@ export async function advanceKnockoutWinner(matchId: string) {
 
   // 2. ELIMINATOR Progression:
   // Winner -> goes to QUALIFIER 2 (teamB)
-  // Loser -> eliminated
+  // Loser -> goes to HARDLINE (teamA)
   if (stage === 'ELIMINATOR') {
     if (q2Knockout) {
       const isManualQ2B = q2Knockout.match?.notes?.includes('MANUAL_SEED');
@@ -818,11 +812,33 @@ export async function advanceKnockoutWinner(matchId: string) {
         }
       }
     }
+
+    if (hardlineKnockout) {
+      const isManualHardlineA = hardlineKnockout.match?.notes?.includes('MANUAL_SEED');
+      if (!isManualHardlineA) {
+        await prisma.match.update({
+          where: { id: hardlineKnockout.matchId },
+          data: { teamAId: loserId || null },
+        });
+        if (loserId) {
+          const loseTeam = await prisma.team.findUnique({ where: { id: loserId } });
+          await prisma.knockoutMatch.update({
+            where: { id: hardlineKnockout.id },
+            data: { seedLabelA: loseTeam ? `Loser Eliminator: ${loseTeam.name}` : 'Loser Eliminator' },
+          });
+        } else {
+          await prisma.knockoutMatch.update({
+            where: { id: hardlineKnockout.id },
+            data: { seedLabelA: 'Loser Eliminator' },
+          });
+        }
+      }
+    }
   }
 
   // 3. QUALIFIER 2 Progression:
   // Winner -> qualifies for FINAL (teamB)
-  // Loser -> eliminated
+  // Loser -> goes to HARDLINE (teamB)
   if (stage === 'QUALIFIER_2') {
     if (finalKnockout) {
       const isManualFinalB = finalKnockout.match?.notes?.includes('MANUAL_SEED');
@@ -841,6 +857,28 @@ export async function advanceKnockoutWinner(matchId: string) {
           await prisma.knockoutMatch.update({
             where: { id: finalKnockout.id },
             data: { seedLabelB: 'Winner Qualifier 2' },
+          });
+        }
+      }
+    }
+
+    if (hardlineKnockout) {
+      const isManualHardlineB = hardlineKnockout.match?.notes?.includes('MANUAL_SEED');
+      if (!isManualHardlineB) {
+        await prisma.match.update({
+          where: { id: hardlineKnockout.matchId },
+          data: { teamBId: loserId || null },
+        });
+        if (loserId) {
+          const loseTeam = await prisma.team.findUnique({ where: { id: loserId } });
+          await prisma.knockoutMatch.update({
+            where: { id: hardlineKnockout.id },
+            data: { seedLabelB: loseTeam ? `Loser Q2: ${loseTeam.name}` : 'Loser Qualifier 2' },
+          });
+        } else {
+          await prisma.knockoutMatch.update({
+            where: { id: hardlineKnockout.id },
+            data: { seedLabelB: 'Loser Qualifier 2' },
           });
         }
       }
@@ -901,6 +939,7 @@ export async function syncKnockoutSeeds(tournamentId: string) {
     'QUALIFIER_1',
     'ELIMINATOR',
     'QUALIFIER_2',
+    'HARDLINE',
     'SEMI_FINALS',
     'FINAL',
   ].includes(tournament.currentStage);
@@ -962,6 +1001,52 @@ export async function syncKnockoutSeeds(tournamentId: string) {
       },
     });
   }
+
+  // Sync Hardline if Eliminator or Qualifier 2 are already complete
+  const hardline = knockoutMatches.find((k) => k.stage === 'HARDLINE');
+  if (hardline && hardline.match.status === 'UPCOMING') {
+    const isManualHardlineA = hardline.match.notes?.includes('MANUAL_SEED');
+    const isManualHardlineB = hardline.match.notes?.includes('MANUAL_SEED');
+
+    if (elim && elim.match.status === 'COMPLETED' && !isManualHardlineA) {
+      let elimLoserId: string | null = null;
+      if (elim.match.teamAScore > elim.match.teamBScore) elimLoserId = elim.match.teamBId;
+      else if (elim.match.teamBScore > elim.match.teamAScore) elimLoserId = elim.match.teamAId;
+      else if (elim.match.winnerId) elimLoserId = elim.match.winnerId === elim.match.teamAId ? elim.match.teamBId : elim.match.teamAId;
+
+      if (elimLoserId && elimLoserId !== hardline.match.teamAId) {
+        const loseTeam = await prisma.team.findUnique({ where: { id: elimLoserId } });
+        await prisma.match.update({
+          where: { id: hardline.matchId },
+          data: { teamAId: elimLoserId },
+        });
+        await prisma.knockoutMatch.update({
+          where: { id: hardline.id },
+          data: { seedLabelA: loseTeam ? `Loser Eliminator: ${loseTeam.name}` : 'Loser Eliminator' },
+        });
+      }
+    }
+
+    const q2 = knockoutMatches.find((k) => k.stage === 'QUALIFIER_2');
+    if (q2 && q2.match.status === 'COMPLETED' && !isManualHardlineB) {
+      let q2LoserId: string | null = null;
+      if (q2.match.teamAScore > q2.match.teamBScore) q2LoserId = q2.match.teamBId;
+      else if (q2.match.teamBScore > q2.match.teamAScore) q2LoserId = q2.match.teamAId;
+      else if (q2.match.winnerId) q2LoserId = q2.match.winnerId === q2.match.teamAId ? q2.match.teamBId : q2.match.teamAId;
+
+      if (q2LoserId && q2LoserId !== hardline.match.teamBId) {
+        const loseTeam = await prisma.team.findUnique({ where: { id: q2LoserId } });
+        await prisma.match.update({
+          where: { id: hardline.matchId },
+          data: { teamBId: q2LoserId },
+        });
+        await prisma.knockoutMatch.update({
+          where: { id: hardline.id },
+          data: { seedLabelB: loseTeam ? `Loser Q2: ${loseTeam.name}` : 'Loser Qualifier 2' },
+        });
+      }
+    }
+  }
 }
 
 /**
@@ -997,6 +1082,7 @@ export async function getKnockoutData(tournamentId?: string) {
       'QUALIFIER_1',
       'ELIMINATOR',
       'QUALIFIER_2',
+      'HARDLINE',
       'SEMI_FINALS',
       'FINAL',
       'COMPLETED',
@@ -1224,7 +1310,59 @@ export async function getKnockoutData(tournamentId?: string) {
     }
   }
 
-  // 4. FINAL (Winner Q1 vs Winner Q2)
+  // 4. HARDLINE (Loser Eliminator vs Loser Qualifier 2)
+  const ovHardline = overrides['HARDLINE'] || {};
+  let hardlineTeamA: any = null;
+  let hardlineSeedA: string | null = null;
+  if (ovHardline.teamAId === 'NO_TEAM') {
+    hardlineTeamA = null;
+    hardlineSeedA = 'NO TEAM';
+  } else if (ovHardline.teamAId && teamsById.has(ovHardline.teamAId)) {
+    hardlineTeamA = teamsById.get(ovHardline.teamAId);
+    hardlineSeedA = ovHardline.seedLabelA || hardlineTeamA.name;
+  } else if (loserElim) {
+    hardlineTeamA = loserElim;
+    hardlineSeedA = `Loser Eliminator: ${loserElim.name}`;
+  } else {
+    hardlineTeamA = null;
+    hardlineSeedA = 'Loser Eliminator';
+  }
+
+  let hardlineTeamB: any = null;
+  let hardlineSeedB: string | null = null;
+  if (ovHardline.teamBId === 'NO_TEAM') {
+    hardlineTeamB = null;
+    hardlineSeedB = 'NO TEAM';
+  } else if (ovHardline.teamBId && teamsById.has(ovHardline.teamBId)) {
+    hardlineTeamB = teamsById.get(ovHardline.teamBId);
+    hardlineSeedB = ovHardline.seedLabelB || hardlineTeamB.name;
+  } else if (loserQ2) {
+    hardlineTeamB = loserQ2;
+    hardlineSeedB = `Loser Q2: ${loserQ2.name}`;
+  } else {
+    hardlineTeamB = null;
+    hardlineSeedB = 'Loser Qualifier 2';
+  }
+
+  const hardlineScoreA = ovHardline.teamAScore ?? 0;
+  const hardlineScoreB = ovHardline.teamBScore ?? 0;
+  const hardlineStatus = ovHardline.status || 'UPCOMING';
+  let thirdPlaceTeam: any = null;
+  let fourthPlaceTeam: any = null;
+  if (hardlineStatus === 'COMPLETED') {
+    if (hardlineScoreA > hardlineScoreB) {
+      thirdPlaceTeam = hardlineTeamA;
+      fourthPlaceTeam = hardlineTeamB;
+    } else if (hardlineScoreB > hardlineScoreA) {
+      thirdPlaceTeam = hardlineTeamB;
+      fourthPlaceTeam = hardlineTeamA;
+    } else {
+      thirdPlaceTeam = ovHardline.winnerId === hardlineTeamB?.id ? hardlineTeamB : hardlineTeamA;
+      fourthPlaceTeam = thirdPlaceTeam === hardlineTeamA ? hardlineTeamB : hardlineTeamA;
+    }
+  }
+
+  // 5. FINAL (Winner Q1 vs Winner Q2)
   const ovFinal = overrides['FINAL'] || {};
   let finalTeamA: any = null;
   let finalSeedA: string | null = null;
@@ -1284,7 +1422,9 @@ export async function getKnockoutData(tournamentId?: string) {
         matchNumber: baseNum,
         teamAScore: q1ScoreA,
         teamBScore: q1ScoreB,
-        time: '05:00 PM',
+        time: ovQ1.time || '05:00 PM',
+        scheduledAt: ovQ1.scheduledAt ? new Date(ovQ1.scheduledAt) : null,
+        date: ovQ1.date ? new Date(ovQ1.date) : new Date(),
         venue: 'Pitch 1 - Main Turf Arena',
         status: q1Status,
         winnerId: winnerQ1?.id || null,
@@ -1304,7 +1444,9 @@ export async function getKnockoutData(tournamentId?: string) {
         matchNumber: baseNum + 1,
         teamAScore: elimScoreA,
         teamBScore: elimScoreB,
-        time: '07:00 PM',
+        time: ovElim.time || '07:00 PM',
+        scheduledAt: ovElim.scheduledAt ? new Date(ovElim.scheduledAt) : null,
+        date: ovElim.date ? new Date(ovElim.date) : new Date(),
         venue: 'Pitch 1 - Main Turf Arena',
         status: elimStatus,
         winnerId: winnerElim?.id || null,
@@ -1324,7 +1466,9 @@ export async function getKnockoutData(tournamentId?: string) {
         matchNumber: baseNum + 2,
         teamAScore: q2ScoreA,
         teamBScore: q2ScoreB,
-        time: '06:00 PM',
+        time: ovQ2.time || '06:00 PM',
+        scheduledAt: ovQ2.scheduledAt ? new Date(ovQ2.scheduledAt) : null,
+        date: ovQ2.date ? new Date(ovQ2.date) : new Date(),
         venue: 'Pitch 1 - Main Turf Arena',
         status: q2Status,
         winnerId: winnerQ2?.id || null,
@@ -1334,17 +1478,41 @@ export async function getKnockoutData(tournamentId?: string) {
       },
     },
     {
+      id: 'preview-hardline',
+      stage: 'HARDLINE',
+      bracketOrder: 4,
+      seedLabelA: hardlineSeedA,
+      seedLabelB: hardlineSeedB,
+      match: {
+        id: 'preview-hardline-match',
+        matchNumber: baseNum + 3,
+        teamAScore: hardlineScoreA,
+        teamBScore: hardlineScoreB,
+        time: ovHardline.time || '07:30 PM',
+        scheduledAt: ovHardline.scheduledAt ? new Date(ovHardline.scheduledAt) : null,
+        date: ovHardline.date ? new Date(ovHardline.date) : new Date(),
+        venue: 'Pitch 1 - Main Turf Arena',
+        status: hardlineStatus,
+        winnerId: thirdPlaceTeam?.id || null,
+        teamA: hardlineTeamA,
+        teamB: hardlineTeamB,
+        events: [],
+      },
+    },
+    {
       id: 'preview-final',
       stage: 'FINAL',
-      bracketOrder: 4,
+      bracketOrder: 5,
       seedLabelA: finalSeedA,
       seedLabelB: finalSeedB,
       match: {
         id: 'preview-final-match',
-        matchNumber: baseNum + 3,
+        matchNumber: baseNum + 4,
         teamAScore: finalScoreA,
         teamBScore: finalScoreB,
-        time: '08:00 PM',
+        time: ovFinal.time || '08:30 PM',
+        scheduledAt: ovFinal.scheduledAt ? new Date(ovFinal.scheduledAt) : null,
+        date: ovFinal.date ? new Date(ovFinal.date) : new Date(),
         venue: 'Pitch 1 - Grand Arena Amreli',
         status: finalStatus,
         winnerId: champion?.id || null,
